@@ -94,9 +94,12 @@ NAME_DATE = re.compile(r"(?<!\d)(\d{4})(?:\d{2}|\d{4})?(?:-\d{2}(?:-\d{2}(?:-\d{
 
 
 def entry(label, value):
-    """An entry of an issue's description: "- entry: value" on one line, the label in bold or
-    not, or the label as a heading, "### label", with the value on the next line that isn't
-    blank."""
+    r"""A regular expression for one entry of an issue's description, whose group 1 is the
+    entry's value. The entry is "- label: value" on one line, with the label in bold or not, or
+    a heading, "### label", with the value on the next line that isn't blank.
+
+    label: a regular expression for the entry's label, such as r"cmor[ \t]+data[ \t]+version".
+    value: a regular expression for the entry's value, such as r"v?\d{8}\b"."""
     return re.compile(r"^[ \t]*(?:[-*+][ \t]+|#{1,6}[ \t]*)?(?:\*\*)?" + label
                       + r"(?:\*\*)?[ \t]*:?[ \t]*(?:\*\*)?\s*`?(" + value + r")", re.M | re.I)
 
@@ -148,7 +151,10 @@ TIMING_LINES = {
 def github_api(url):
     """The JSON GitHub's API returns for url. GitHub allows 60 anonymous requests an hour
     from one address, which every user on NIRD shares; once they are used up, this raises
-    Failed with the time they are available again."""
+    Failed with the time they are available again.
+
+    url: the address of a GitHub API request, such as
+      https://api.github.com/repos/NorESMhub/noresm_cmip7_simulations/issues?page=1."""
     req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
                                                "User-Agent": "nird_progress"})
     try:
@@ -165,8 +171,9 @@ def github_api(url):
 
 
 def fetch_sheet():
-    """The spreadsheet's DECK_FASTTRACK tab as CSV text. Raises Failed if it can't be read,
-    including when Google sends a sign-in page because the spreadsheet is no longer shared."""
+    """The spreadsheet's DECK_FASTTRACK tab as CSV text. It takes no arguments: the tab is
+    SHEET_TAB of SHEET. Raises Failed if it can't be read, including when Google sends a sign-in
+    page because the spreadsheet is no longer shared."""
     url = f"{SHEET}/export?format=csv&gid={SHEET_TAB}"
     req = urllib.request.Request(url, headers={"User-Agent": "nird_progress"})
     try:
@@ -183,8 +190,12 @@ def fetch_sheet():
 
 def check_issues(issues, source):
     """Raises Failed unless issues is a list of issues as GitHub's API gives them, each with
-    a number, a title, labels and a user: anything else, such as an error message GitHub
-    sent instead, would otherwise give a page with wrong or missing runs."""
+    a number, a title, labels and a user. Anything else, such as an error message GitHub sent
+    instead, would otherwise give a page with wrong or missing runs.
+
+    issues: what was read as a list of issues, from GitHub's API or from the --issues file.
+    source: where it was read from, for the message, such as "GitHub's page 2 of
+      NorESMhub/CMIP7_CMOR-Publish's issues"."""
     if not isinstance(issues, list):
         raise Failed(f"{source} did not give a list of issues: {str(issues)[:200]}")
     for i in issues:
@@ -196,7 +207,9 @@ def check_issues(issues, source):
 
 def fetch_issues(repo):
     """Every issue in the repository, open and closed, without pull requests. Raises Failed
-    if GitHub gives anything but issues."""
+    if GitHub gives anything but issues.
+
+    repo: the repository as owner/name, such as NorESMhub/CMIP7_CMOR-Publish."""
     issues = []
     page = 1
     while True:
@@ -210,8 +223,12 @@ def fetch_issues(repo):
 
 
 def list_run_scripts(repo, scripts_dir=None):
-    """The run scripts' paths below scripts/, from scripts_dir if given and from the
-    CMIP7_Runscripts branch on GitHub otherwise, and why they couldn't be listed if they couldn't."""
+    """The run scripts' paths below scripts/, as (paths, None), or (None, why) if they
+    couldn't be listed.
+
+    repo: the repository, as owner/name, whose CMIP7_Runscripts branch has the run scripts.
+    scripts_dir: a local scripts/ directory to list instead, from --scripts; None to list the
+      branch on GitHub."""
     try:
         if scripts_dir:
             if not os.path.isdir(scripts_dir):
@@ -226,8 +243,13 @@ def list_run_scripts(repo, scripts_dir=None):
 
 
 def read_run_script(repo, path, scripts_dir=None):
-    """The text of the run script at path below scripts/, from scripts_dir if given and from
-    the CMIP7_Runscripts branch on GitHub otherwise, and why it couldn't be read if it couldn't."""
+    """The text of one run script, as (text, None), or (None, why) if it couldn't be read.
+
+    repo: the repository, as owner/name, whose CMIP7_Runscripts branch has the run script.
+    path: the run script's path below scripts/, as list_run_scripts() gives it, such as
+      DECK/piControl/011.piControl.LM.beta28.r1i1p1f1.20261102.sh.
+    scripts_dir: a local scripts/ directory to read it from instead, from --scripts; None to
+      read it from GitHub."""
     try:
         if scripts_dir:
             with open(os.path.join(scripts_dir, path), encoding="utf-8", errors="replace") as f:
@@ -246,10 +268,12 @@ def read_run_script(repo, path, scripts_dir=None):
 
 
 def xmlchange_calls(line):
-    """The arguments of each call to xmlchange on a line of a shell script. A call is any
-    command whose program is named xmlchange, whatever its path: ./xmlchange,
+    """The arguments of each call to xmlchange on the line, as a list of lists of strings. A
+    call is any command whose program is named xmlchange, whatever its path: ./xmlchange,
     $CASEROOT/xmlchange, or one after other commands, as in cd $CASEROOT && ./xmlchange.
-    A line the shell could not split, such as one with an unclosed quote, has none."""
+    A line the shell could not split, such as one with an unclosed quote, has none.
+
+    line: one line of a shell script, with any lines continued by a backslash joined to it."""
     lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     try:
@@ -270,13 +294,19 @@ def xmlchange_calls(line):
 
 def run_settings(text):
     """The RUN_TYPE, RUN_REFCASE, RUN_REFDATE and RUN_STARTDATE a run script sets with
-    xmlchange, either as KEY=value[,KEY=value] or as --id KEY --val value. A shell variable
+    xmlchange, as a dict with the keys type, refcase, refdate and startdate, for those it sets.
+    They are set either as KEY=value[,KEY=value] or as --id KEY --val value. A shell variable
     the script gives a plain value, such as refcase="...", is filled in; a setting whose value
-    still depends on the shell, such as $(date), is left out."""
+    still depends on the shell, such as $(date), is left out.
+
+    text: the run script's text."""
     variables = {}
     settings = {}
 
     def expand(value):
+        """The value with each $name or ${name} of a shell variable the script has set filled in.
+
+        value: a line of the script."""
         return re.sub(r"\$\{(\w+)\}|\$(\w+)",
                       lambda m: variables.get(m.group(1) or m.group(2), m.group(0)), value)
 
@@ -296,7 +326,10 @@ def run_settings(text):
 
 
 def xmlchange_pairs(args):
-    """The (KEY, value) pairs one xmlchange call sets, given its arguments."""
+    """The (KEY, value) pairs one xmlchange call sets.
+
+    args: the call's arguments, as xmlchange_calls() gives them, such as
+      ["RUN_TYPE=hybrid,RUN_REFDATE=0101-01-01"] or ["--id", "RUN_TYPE", "--val", "hybrid"]."""
     if "--id" in args:
         i = args.index("--id")
         val = args[args.index("--val") + 1] if "--val" in args[:-1] else None
@@ -315,7 +348,9 @@ CASE_VARIABLES = ("casename", "CASENAME", "case_name", "CASE_NAME", "case", "CAS
 def script_case_name(text):
     """The case name a run script creates: the last part of create_newcase's --case path, with
     the shell variables it uses filled in. A part known only when the script runs, such as
-    $(date +%Y%m%d), is UNKNOWN. None if the script names no case."""
+    $(date +%Y%m%d), is UNKNOWN. None if the script names no case.
+
+    text: the run script's text."""
     # Commands continued over several lines with a backslash become one line, and $(...) is
     # replaced first, since it may hold quotes of its own.
     text = re.sub(r"\\\n", " ", text)
@@ -332,6 +367,11 @@ def script_case_name(text):
             newcase = m.group(1).strip("\"'")
 
     def expand(value, depth=0):
+        """The value with each shell variable filled in, and UNKNOWN for one the script doesn't set.
+
+        value: the text to expand, such as the --case path.
+        depth: how many variables deep this is; past ten, the value is UNKNOWN, so that variables
+          that refer to each other can't loop."""
         if depth > 10:
             return UNKNOWN
         return re.sub(r"\$\{(\w+)[^}]*\}|\$(\w+)",
@@ -350,15 +390,22 @@ def name_pattern(name, unknown):
     stands for one part of a case name without a dot, such as the 20261016 of
     $(date +%Y%m%d). So n1850GHGGaxg.LM.nor30b27.002.<date> fits
     n1850GHGGaxg.LM.nor30b27.002.20261016, but not ...002.20261022.oxidtest, a test made
-    with the same script, nor ...002.20261016.cmor, cmip7-prep's output."""
+    with the same script, nor ...002.20261016.cmor, cmip7-prep's output.
+
+    name: a case name with unknown parts, such as script_case_name() gives.
+    unknown: the character that marks each unknown part: UNKNOWN in a name from a run script,
+      and "*" in a case name the page has, where nothing on NIRD fits it yet."""
     return re.compile("[^./]+".join(re.escape(p) for p in name.split(unknown)) + r"\Z")
 
 
 def find_case(name, case_dir):
-    """The case's name on NIRD: name itself if all of it is known, or else the one case
-    directory, below case_dir with {case} as its last part, whose name fits name with any
-    UNKNOWN part, e.g. its $(date). Of several that fit, the latest by name. None if none
-    fits; the directories that fit are returned too."""
+    """The case's name on NIRD and the case directories that fit it, as (name, fits). If all
+    of name is known, it is (name, []). Otherwise name is the one directory, below case_dir with
+    {case} as its last part, whose name fits name with any UNKNOWN part, e.g. its $(date). Of
+    several that fit, it is the latest by name, and None if none fits.
+
+    name: the case name its run script gives, from script_case_name().
+    case_dir: where a case's directory is on NIRD, with {case} for its name: CASE_DIR."""
     if UNKNOWN not in name:
         return name, []
     parent, last = os.path.split(case_dir)
@@ -370,9 +417,13 @@ def find_case(name, case_dir):
 
 
 def model_dates(directory, pattern):
-    """The latest (year, month, day) among the matching files, and the years between the
-    first and the last file that have no file. None if there are no files, False if the
-    directory doesn't exist. A monthly file (no day) is dated at the start of the next month."""
+    """The latest (year, month, day) among the files, and the years between the first and
+    the last file that have no file. None if there are no files, False if the directory doesn't
+    exist. A monthly file (no day) is dated at the start of the next month.
+
+    directory: the directory of the files, such as a case's atm/hist.
+    pattern: a shell-style pattern for the files' names, such as HIST_PATTERN. A file is dated
+      by the date DATE finds just before .nc."""
     if not os.path.isdir(directory):
         return False
     dates = []
@@ -405,7 +456,9 @@ def cmor_sets(directory):
     """[{first, last, steps, failed}] for each completed_steps_<first>-<last>.json. steps are
     the cmor- steps it lists, the ones that finished. failed are the cmor- steps that ran, so
     have a log in logs/<first>-<last>/, but are not listed: they failed or are still running.
-    The file alone can't show a realm that failed in every set, since it lists no failures."""
+    The file alone can't show a realm that failed in every set, since it lists no failures.
+
+    directory: cmip7-prep's output directory for the case, such as <case>.cmor."""
     sets = []
     for path in glob.glob(os.path.join(glob.escape(directory), "completed_steps_*.json")):
         m = COMPLETED.search(os.path.basename(path))
@@ -426,7 +479,11 @@ def cmor_sets(directory):
 
 def sync_report(source, dest):
     """Makes dest a copy of the directory source: copies each file that dest lacks or has at
-    another size or modification time, and removes from dest what source no longer has."""
+    another size or modification time, and removes from dest what source no longer has.
+
+    source: a case's validation report directory, <cmip7-prep output>/cmor/validation_reports.
+    dest: where its copy goes, validation/<case> next to progress.json. It is created if it
+      doesn't exist."""
     for root, dirs, files in os.walk(source):
         target = os.path.normpath(os.path.join(dest, os.path.relpath(root, source)))
         os.makedirs(target, exist_ok=True)
@@ -449,13 +506,19 @@ _cmor_files = {}
 
 
 def file_version(dirpath):
-    """The version directory, vYYYYMMDD, nearest above a file; None if there is none."""
+    """The version directory, vYYYYMMDD, nearest above a file; None if there is none.
+
+    dirpath: the directory the file is in."""
     return next((p for p in reversed(dirpath.split(os.sep)) if VERSION_DIR.match(p)), None)
 
 
 def cmor_files(directory):
     """A list of (name match, version, bytes), one for each CMOR file with a time range under
-    the directory, read once per run."""
+    the directory, read once per run. The name match is CMOR_FILE's: group 1 is the name before
+    the time range, from the variable to the grid, and groups 2 and 3 are its first and last
+    year. The version is file_version()'s.
+
+    directory: one tool's CMOR output directory, such as <case>.cmor/cmor or CMOR4CMIP7_DIR."""
     if directory not in _cmor_files:
         _cmor_files[directory] = [(m, file_version(d), size(os.path.join(d, name)))
                                   for d, _, names in os.walk(directory)
@@ -464,7 +527,9 @@ def cmor_files(directory):
 
 
 def size(path):
-    """The file's size in bytes, 0 if it can't be read."""
+    """The file's size in bytes, 0 if it can't be read.
+
+    path: the file's path."""
     try:
         return os.path.getsize(path)
     except OSError:
@@ -473,15 +538,19 @@ def size(path):
 
 def file_years(name):
     """The model years a file's name covers: from its first to its last date, written as
-    YYYY, YYYY-MM[-DD[-SSSSS]] or YYYYMM[DD]. The case name is taken out first, since its
-    date is not a model date."""
+    YYYY, YYYY-MM[-DD[-SSSSS]] or YYYYMM[DD].
+
+    name: the file's name, with the case name taken out, since its date is not a model date."""
     years = [int(m.group(1)) for m in NAME_DATE.finditer(name)]
     return range(min(years), max(years) + 1) if years else range(0)
 
 
 def output_size(paths, case):
     """{gib, years} for the netCDF files: their size in GiB, and how many model years their
-    names cover; None if there are no dated ones."""
+    names cover; None if there are no dated ones.
+
+    paths: the paths of the files, such as files_below() gives for a hist directory.
+    case: the case's name, which is taken out of each file's name before it is dated."""
     years = set()
     total = 0
     for path in paths:
@@ -492,7 +561,11 @@ def output_size(paths, case):
 
 
 def files_below(directory, skip=None):
-    """The paths of the files below the directory, leaving out its subdirectory skip."""
+    """The paths of the files below the directory, leaving out its subdirectory skip.
+
+    directory: the directory to search.
+    skip: the name of a subdirectory of directory to leave out, such as "cmor"; None to leave
+      out nothing."""
     paths = []
     for d, subdirs, names in os.walk(directory):
         if d == directory and skip in subdirs:
@@ -504,10 +577,16 @@ def files_below(directory, skip=None):
 def settled_storage(storage):
     """The kinds of a case's earlier measurement to keep: those with at least
     STORAGE_YEARS years, by then a steady rate, and in GiB. History counts its longest
-    component, and CMOR is kept tool by tool. Restarts are measured on every run."""
+    component, and CMOR is kept tool by tool. Restarts are measured on every run.
+
+    storage: the case's "storage" in the last progress.json, as case_storage() gave it. Anything
+      else, such as None when the case has none, keeps nothing."""
     storage = storage if isinstance(storage, dict) else {}
 
     def settled(v):
+        """Whether one kind's measurement is in GiB and covers at least STORAGE_YEARS years.
+
+        v: the measurement, {gib, years}."""
         return isinstance(v, dict) and "gib" in v and v.get("years", 0) >= STORAGE_YEARS
 
     kept = {}
@@ -526,7 +605,9 @@ def restart_sets(rest):
     """The restart sets kept in rest/, as {gib, sets, setGib, everyYears}: their total size,
     how many there are, the mean size of one, and the years between one set and the next,
     from the dates the sets' directories are named after (None with fewer than two sets).
-    rest/ with files but no dated directories is one set. None if rest/ is empty."""
+    rest/ with files but no dated directories is one set. None if rest/ is empty.
+
+    rest: the case's rest/ directory."""
     if not os.path.isdir(rest):
         return None
     dated = sorted(d for d in os.listdir(rest) if REST_SET.match(d) and os.path.isdir(os.path.join(rest, d)))
@@ -549,9 +630,17 @@ def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, labels, kept=None):
     """How much output the case has on NIRD, in GiB: as {gib, years} for hist, a dict by
     component of the <component>/hist directories; timeseries, cmip7-prep's time series, the
     files in its directory outside cmor/; and cmor, by tool, the CMOR files, each version's
-    years counted. rest is the restart sets in rest/, as restart_sets() gives them. The kinds
-    in kept, from an earlier run, are not measured again. A kind with nothing on NIRD is left
-    out."""
+    years counted. rest is the restart sets in rest/, as restart_sets() gives them. A kind with
+    nothing on NIRD is left out.
+
+    case_dir: the case's directory on NIRD, CASE_DIR with its name.
+    case: the case's name.
+    prep_dir: cmip7-prep's output directory for the case; None if it has none.
+    cmor4cmip7_dir: cmor4cmip7's output directory for the case; None if it has none.
+    labels: the names of the case issue's labels, such as ["piControl", "r1i1p1f1"], which
+      pick the case's CMOR files, as in case_files().
+    kept: the kinds of the last run's measurement to keep instead of measuring them again, as
+      settled_storage() gives them; None to measure them all."""
     kept = kept or {}
     storage = {k: v for k, v in kept.items() if k != "cmor"}
     if case_dir and os.path.isdir(case_dir):
@@ -583,7 +672,9 @@ def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, labels, kept=None):
 
 
 def year_ranges(years):
-    """[[first, last], ...] for the runs of consecutive years."""
+    """[[first, last], ...] for the runs of consecutive years.
+
+    years: the years, as integers, in any order."""
     ranges = []
     for y in sorted(years):
         if ranges and y == ranges[-1][1] + 1:
@@ -594,9 +685,15 @@ def year_ranges(years):
 
 
 def case_files(directory, labels):
-    """A list of (name match, version, bytes), one for each of the case's CMOR files under
-    the directory: those whose name has one of its labels as the experiment, followed by its
-    variant label, as in so_Omon_NorESM3_piControl_r1i1p1f1_gn_000101-001012.nc."""
+    """A list of (name match, version, bytes), as cmor_files() gives them, one for each of the
+    case's CMOR files under the directory: those whose name has one of its labels as the
+    experiment, followed by its variant label, as in so_Omon_NorESM3_piControl_r1i1p1f1_gn_
+    000101-001012.nc.
+
+    directory: one tool's CMOR output directory, such as <case>.cmor/cmor or CMOR4CMIP7_DIR.
+    labels: the names of the case issue's labels, such as ["piControl", "r1i1p1f1"]. The one
+      that looks like r1i1p1f1 is the variant, and the rest may be the experiment. Without a
+      variant label, the case has no files."""
     variant = next((l for l in labels if VARIANT.match(l)), None)
     if not variant:
         return []
@@ -607,7 +704,10 @@ def case_files(directory, labels):
 def cmor_file_years(directory, labels):
     """[[first, last], ...]: the years every variable of the case has a file for under the
     directory, from the time ranges in the CMOR file names. Files without a time range
-    (fixed fields) don't count."""
+    (fixed fields) don't count.
+
+    directory: one tool's CMOR output directory, such as CMOR4CMIP7_DIR.
+    labels: the names of the case issue's labels, which pick its files, as in case_files()."""
     by_var = {}
     for m, _, _ in case_files(directory, labels):
         by_var.setdefault(m.group(1), set()).update(range(int(m.group(2)), int(m.group(3)) + 1))
@@ -616,7 +716,10 @@ def cmor_file_years(directory, labels):
 
 def cmor_versions(directory, labels):
     """{version: [[first, last], ...]}: the years of the case's CMOR files under the
-    directory, by the version directory they are in."""
+    directory, by the version directory they are in.
+
+    directory: one tool's CMOR output directory, such as <case>.cmor/cmor or CMOR4CMIP7_DIR.
+    labels: the names of the case issue's labels, which pick its files, as in case_files()."""
     by_version = {}
     for m, v, _ in case_files(directory, labels):
         if v:
@@ -626,7 +729,9 @@ def cmor_versions(directory, labels):
 
 def read_timing_file(path):
     """{cost, sypd, days, pes, machine, date} from one timing file; None if it lacks cost or
-    throughput. The date is when the job ended (Curr Date), or the file's time without one."""
+    throughput. The date is when the job ended (Curr Date), or the file's time without one.
+
+    path: the timing file, noresm_timing.<case>.<job id>.<date>, gzipped or not."""
     opener = gzip.open if path.endswith(".gz") else open
     try:
         with opener(path, "rt", encoding="utf-8", errors="replace") as f:
@@ -652,10 +757,12 @@ def read_timing_file(path):
 def case_timing(directory):
     """The case's cost and throughput on each machine it ran on, averaged over all its
     timing files there with each job weighted by the years it simulated: cost in pe-hours,
-    which are core-hours, per simulated year, throughput in simulated years per day. Each machine's entry also
-    lists its jobs, [end date, cost, throughput, years], for the page's plot of how the
-    timings vary. Returns ([{machine, jobs, years, cost, sypd, pes, runs}], the machine of
-    its latest job), or (None, None) if there are no readable timing files."""
+    which are core-hours, per simulated year, and throughput in simulated years per day. Each
+    machine's entry also lists its jobs, [end date, cost, throughput, years], for the page's
+    plot of how the timings vary. Returns ([{machine, jobs, years, cost, sypd, pes, runs}], the
+    machine of its latest job), or (None, None) if there are no readable timing files.
+
+    directory: the case's timing directory, <case>/<case>/timing in its archive."""
     paths = glob.glob(os.path.join(glob.escape(directory), "noresm_timing.*"))
     jobs = sorted((t for path in paths if (t := read_timing_file(path))), key=lambda t: t["date"])
     if not jobs:
@@ -681,6 +788,10 @@ def case_timing(directory):
 def main():
     # On NIRD the script is run with no arguments. They are for testing a change without
     # touching the published page, and for measuring the storage again.
+    """Reads the case issues, their run scripts, the case directories on NIRD and the
+    spreadsheet, and writes progress.json and the page. It takes its inputs from the command
+    line; on NIRD, there are none. Raises Failed, and writes nothing, if anything it needs can't
+    be read or the page can't be built."""
     parser = argparse.ArgumentParser()
     parser.add_argument("out", nargs="?", default=PROGRESS,
                         help=f"where to write progress.json; the page, index.html, goes next to it (default {PROGRESS})")

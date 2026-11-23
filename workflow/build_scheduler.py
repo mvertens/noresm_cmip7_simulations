@@ -38,8 +38,11 @@ RESOLUTION_COLUMN = "Resolution"
 
 
 def read_experiments(text):
-    """The experiments in the CSV text of the spreadsheet's tab, one dictionary per row below
-    the header row, the row with an experiment_id column. Rows above it are notes."""
+    """The experiments in the spreadsheet's tab, one dictionary per row below the header row,
+    the row with an experiment_id column, keyed by the header row's headings. Rows above it are
+    notes.
+
+    text: the CSV text of the spreadsheet's DECK_FASTTRACK tab."""
     rows = list(csv.reader(io.StringIO(text, newline="")))
     for i, row in enumerate(rows):
         if HEADER_KEY in [c.strip() for c in row]:
@@ -88,6 +91,9 @@ COSTS = [
 
 
 def number(v):
+    """v as a float, or None if it isn't a number.
+
+    v: a cell of the spreadsheet, such as "170" or ""."""
     try:
         return float(v)
     except (TypeError, ValueError):
@@ -95,11 +101,20 @@ def number(v):
 
 
 def compset_rules(costs):
-    """(resolution, pattern, configuration) for every compset listed in the cost table."""
+    """(resolution, pattern, configuration name) for every compset the cost table lists.
+
+    costs: the cost table, COSTS."""
     return [(c["resolution"], pattern, c["name"]) for c in costs for pattern in c["compsets"].split()]
 
 
 def config_name(exp, resolution, rules=()):
+    """The name of the configuration from the cost table that the experiment is run with at
+    the resolution, by the rule in this module's docstring.
+
+    exp: one experiment, a row of the spreadsheet as read_experiments() gives it.
+    resolution: the resolution, "LM" or "MM".
+    rules: the compsets of the cost table, as compset_rules() gives them; empty to choose by
+      the required model components and compset alone."""
     compset_alias = exp.get("Compset Alias", "").strip()
     for res, pattern, name in rules:
         if res == resolution and compset_alias and fnmatch.fnmatchcase(compset_alias, pattern):
@@ -120,13 +135,20 @@ def config_name(exp, resolution, rules=()):
 
 def resolutions_of(exp):
     """The resolutions the experiment is run at, from its Resolution column: "LM, MM" is
-    ["LM", "MM"], and an empty cell is none."""
+    ["LM", "MM"], and an empty cell is none.
+
+    exp: one experiment, a row of the spreadsheet as read_experiments() gives it."""
     return [r.strip().upper() for r in exp.get(RESOLUTION_COLUMN, "").replace("/", ",").split(",")
             if r.strip()]
 
 
 def build(experiments, costs):
-    """The configurations, the runs and the warnings."""
+    """The configurations, the runs and the warnings, as (configs, sims, warnings): the page's
+    DEFAULT_CONFIGS and DEFAULT_SIMS, and what was left out of them and why. Raises ValueError if
+    the spreadsheet has no Resolution column.
+
+    experiments: the spreadsheet's experiments, as read_experiments() gives them.
+    costs: the cost table, COSTS."""
     configs = [{"id": f"c{i}", "name": c["name"], "costPerYear": c["costPerYear"],
                 "throughput": c["throughput"], "betzyCostPerYear": c.get("betzyCostPerYear"),
                 "betzyThroughput": c.get("betzyThroughput")} for i, c in enumerate(costs, 1)]
@@ -192,19 +214,27 @@ def build(experiments, costs):
 
 def script_json(x):
     """x as JSON that is safe inside the page's <script>: "</" is written "<\\/", so no
-    text from the spreadsheet can end the script early."""
+    text from the spreadsheet can end the script early.
+
+    x: anything json.dumps can write, such as one run."""
     return json.dumps(x, ensure_ascii=False).replace("</", "<\\/")
 
 
 def literal(items):
+    """The items as the lines of a JavaScript array's body, one item per line.
+
+    items: the configurations or the runs, as build() gives them."""
     return "\n".join("    " + script_json(x) + "," for x in items)
 
 
 def page_text(sheet_text, sheet):
-    """The page as text, with the configurations, the runs and the warnings. sheet_text is
-    the CSV text of the spreadsheet's DECK_FASTTRACK tab. sheet says where it came from, for
-    the line on the page: its "url", when it was "read", and the "file" it was read from
-    instead, if any.
+    """The page as text, with the configurations, the runs and the warnings, as
+    (page, configs, sims, warnings).
+
+    sheet_text: the CSV text of the spreadsheet's DECK_FASTTRACK tab.
+    sheet: where sheet_text came from, for the line on the page: {"url": the spreadsheet's
+      address, "read": when it was read, "file": the --sheet file it was read from instead, if
+      it was}.
 
     1. It reads the experiments from sheet_text.
     2. For each resolution in the spreadsheet's Resolution column, it picks the experiments
