@@ -392,9 +392,9 @@ above the tables shows every run in the plan.
   has started on. Clicking the chip opens a panel with the case's output
   directory and a link to the case's validation report, which says what is
   missing or wrong.
-- A cmor4cmip7 chip is red when the script found a problem with the case's
-  files: years that some variables have and others lack, or a year that is in
-  more than one file. Clicking it lists the problems.
+- Clicking a cmor4cmip7 chip lists the problems the script found with the
+  case's files: years that some variables have and others lack, or a year that
+  is in more than one file. The chip's colour does not change.
 - Each run is costed from measured timings once there are any, separately for
   Olivia and Betzy. A run whose cases have timing files uses its own measured
   cost and throughput. Any other run uses the mean over all the cases of its
