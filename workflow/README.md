@@ -219,7 +219,7 @@ title: it is the last part of the path the script gives `create_newcase
 NIRD has this name. A part of the name the script only knows when it runs, such
 as the date from `$(date +%Y%m%d)`, is taken from the one directory on NIRD
 whose name fits. An unknown part stands for one part of the name without a
-dot: piControl's script, with `n1850GHGGaxg.LM.nor30b27.002.$(date +"%Y%m%d")`,
+dot: the run script of piControl's #2, with `n1850GHGGaxg.LM.nor30b27.002.$(date +"%Y%m%d")`,
 fits `n1850GHGGaxg.LM.nor30b27.002.20261016`, but not
 `n1850GHGGaxg.LM.nor30b27.002.20261022.oxidtest`, a test made with the same
 script, nor cmip7-prep's `n1850GHGGaxg.LM.nor30b27.002.20261016.cmor`. If
@@ -237,7 +237,11 @@ Issues with the `test` label are not CMIP7 runs and are left out. An issue's
 title may have only letters, digits, `.`, `-` and `_`. Any other title, such as
 one with a space for a run that is not set up yet, is a note, and the issue is
 left out as soon as the issues are read, before anything from it is used. An issue whose case name is not of the form
-`compset.LM.nor30b28...` is also left out. For each issue left out, the script
+`compset.LM.nor30b28...` is also left out. A new case's name starts with its
+compset's name exactly as the spreadsheet gives it, with a capital N, such as
+`NHistGhgGaxg.LM.nor30b29a.r2i1p1f1.020.20261113`. The cases made before the
+compset names were settled, such as #2, start with a small n; the script reads
+both. For each issue left out, the script
 prints a line saying why.
 
 #### The case's experiment and labels

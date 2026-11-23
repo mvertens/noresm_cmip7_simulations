@@ -614,9 +614,9 @@
           <li id="wf-prepare">
             <details class="wf-more" id="wf-casename">
               <summary>Determine the case name</summary>
-              <p>A case is named <code>compset.resolution.version.variant.issue.date</code>, for example <code>n1850GHGGaxg.LM.nor30b28.r1i1p1f1.011.20261102</code>. Names without the variant, such as piControl's #11, <code>n1850GHGGaxg.LM.nor30b28.011.20261102</code>, are read too.</p>
+              <p>A case is named <code>compset.resolution.version.variant.issue.date</code>, for example historical's #20, <code>NHistGhgGaxg.LM.nor30b29a.r2i1p1f1.020.20261113</code>. Names without the variant, such as abrupt-2xCO2's #14, <code>N2xCO2GhgGaxg.LM.nor30b28.014.20261106</code>, are read too. So are the names of the cases made before the compset names were settled, which start with a small n, such as piControl's #11, <code>n1850GHGGaxg.LM.nor30b28.011.20261102</code>; a new case uses the compset's name exactly.</p>
               <ul class="wf-parts">
-              <li><b>compset:</b> see column M of the <a href="https://docs.google.com/spreadsheets/d/1PZQHmOHVENJeCqwSfk4wfp8okQXw60Bv/edit?gid=13331701#gid=13331701" target="_blank" rel="noopener">NorESM3 CMIP7 experiments spreadsheet</a>;</li>
+              <li><b>compset:</b> the compset's name exactly as in column M of the <a href="https://docs.google.com/spreadsheets/d/1PZQHmOHVENJeCqwSfk4wfp8okQXw60Bv/edit?gid=13331701#gid=13331701" target="_blank" rel="noopener">NorESM3 CMIP7 experiments spreadsheet</a>, e.g. <code>NHistGhgGaxg</code>. NorESM3's compset names start with a capital N;</li>
               <li><b>resolution:</b> <code>LM</code> for ne16pg3_tn14, <code>MM</code> for ne30pg3_tn14;</li>
               <li><b>version:</b> <code>nor30</code> for noresm3_0_, followed by the beta, e.g. <code>b28</code> for beta28 or <code>b29a</code> for beta29a;</li>
               <li><b>variant:</b> the ensemble member, as in the issue's <a href="#wf-issue">variant label</a>, e.g. <code>r1i1p1f1</code>;</li>
@@ -645,7 +645,7 @@
                 <li><b>directory:</b> <code>scripts/&lt;MIP&gt;/&lt;experiment&gt;/</code>, e.g. <code>scripts/CMIP/piControl/</code>. The tracker takes the case's experiment from this directory, so it must be spelt as in the tracker; a run script anywhere else stops the progress script. A case that is not a CMIP7 run, whose issue has the <code class="wf-labelname">test</code> label, goes in <code>scripts/test/</code>;</li>
                 <li><b>name:</b> <code>issue.experiment.resolution.beta.variant.date.sh</code>. The progress script finds the case's script by the issue number it starts with, so no other script may start with it:
                   <ul>
-                    <li>the experiment from its directory, the variant from the issue's label, the rest from the case name, e.g. <code>011.piControl.LM.beta28.r1i1p1f1.20261102.sh</code> for <code>n1850GHGGaxg.LM.nor30b28.011.20261102</code>;</li>
+                    <li>the experiment from its directory, the variant from the issue's label, the rest from the case name, e.g. <code>020.historical.LM.beta29a.r2i1p1f1.20261113.sh</code> for <code>NHistGhgGaxg.LM.nor30b29a.r2i1p1f1.020.20261113</code>;</li>
                   </ul></li>
                 <li><b>push:</b> in a clone of the repository,
                   <ul>
@@ -689,13 +689,13 @@
         <ul class="wf-steps">
           <li id="wf-cmorissue"><div class="wf-title">Make the CMORization issue</div>
             <p>Once the simulation has finished, open an issue in <a href="https://github.com/NorESMhub/CMIP7_CMOR-Publish/issues" target="_blank" rel="noopener">NorESMhub/CMIP7_CMOR-Publish</a> from its template, which is like the CMIP6 one, and label it <code class="wf-labelname">cmorization</code>. The repository's other labels are <code class="wf-labelname">publication</code>, <code class="wf-labelname">archive</code>, <code class="wf-labelname">cmor_bug</code>, <code class="wf-labelname">publication_bug</code> and <code class="wf-labelname">retract</code>.</p>
-            <p>Name each case the issue CMORizes by its case name, e.g. <code>n1850GHGGaxg.LM.nor30b27.002.20261016</code>, as the template asks. The progress script finds the CMORization issues that name a case, and the tracker links each after the case's issue as <a class="script-chip cmor-chip">cmor</a>. Clicking a case's chip in the cmip7prep or cmor4cmip7 column shows the CMORization issue and its cmor tag version too.</p>
+            <p>Name each case the issue CMORizes by its case name, e.g. <code>NHistGhgGaxg.LM.nor30b29a.r2i1p1f1.020.20261113</code>, as the template asks. The progress script finds the CMORization issues that name a case, and the tracker links each after the case's issue as <a class="script-chip cmor-chip">cmor</a>. Clicking a case's chip in the cmip7prep or cmor4cmip7 column shows the CMORization issue and its cmor tag version too.</p>
             <div class="wf-decide"><b>To decide:</b> how urgency is shown.</div></li>
           <li id="wf-cmoratm"><div class="wf-title">CMORize the atmosphere, land, sea ice and land ice using cmip7-prep</div>
             <p>The CMORized output goes in <code>/nird/datalake/NS9560K/noresm3/cases/$CASE.cmor</code> for now, and will later go in <code>/nird/datapeak/NS9034K</code> with the cmor4cmip7 output. The tracker's cmip7prep column shows it as follows:</p>
             <ul class="wf-parts">
               <li><b>where:</b> the progress script reads the case's own <code>.cmor</code> directory, not the ones below it;</li>
-              <li><b>which issue:</b> each case has its own <code>.cmor</code> directory, named after its issue's title, so everything in it belongs to that issue. piControl's #2 can be done while #11 is not;</li>
+              <li><b>which issue:</b> each case has its own <code>.cmor</code> directory, named after the case, so everything in it belongs to that case's issue. piControl's #2 can be done while #11 is not;</li>
               <li><b>years:</b> cmip7-prep writes a <code>completed_steps_&lt;first&gt;-&lt;last&gt;.json</code> file for each set of years it has CMORized. A set counts once it has finished every <code>cmor-</code> step that any of the simulation's sets has run, so a set where one realm failed doesn't count, even if that realm failed in every set. The chip shows the years of the sets that count, e.g. <code>#002 1–50</code>;</li>
               <li><b>no set counts yet:</b> the chip shows the years of all the sets;</li>
               <li><b>validation report:</b> clicking the chip links to the case's validation report, which cmip7-prep writes to <code>cmor/validation_reports/</code> and the progress script copies next to the tracker.</li>

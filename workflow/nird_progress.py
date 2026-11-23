@@ -61,8 +61,10 @@ VALIDATION_COPIES = "validation"
 # The characters an issue's title may have.
 TITLE_CHARACTERS = re.compile(r"[A-Za-z0-9._-]+")
 
-# compset.resolution.version...: n1850GHGGaxg.LM.nor30b28.r1i1p1f1.011.20261102, or without
-# the variant, n1850GHGGaxg.LM.nor30b28.011.20261102. The beta may end in a letter: nor30b29a.
+# compset.resolution.version...: NHistGhgGaxg.LM.nor30b29a.r2i1p1f1.020.20261113, or without
+# the variant, N2xCO2GhgGaxg.LM.nor30b28.014.20261106. The beta may end in a letter: nor30b29a.
+# The compset's case is not checked, so the older names with a small n, such as
+# n1850GHGGaxg.LM.nor30b28.011.20261102, are read too.
 TITLE = re.compile(r"^[A-Za-z0-9-]+\.(LM|MM)\.nor30(b\d+[a-z]?)\.")
 RESOLUTION = {"LM": "LM", "MM": "MM"}
 
@@ -89,7 +91,7 @@ REST_SET = re.compile(r"^(\d{4})-(\d{2})-(\d{2})-\d{5}$")
 # file covers. Only the year of each date is kept. A date is written in one of these
 # forms: YYYY, YYYYMM, YYYYMMDD, YYYY-MM, YYYY-MM-DD or YYYY-MM-DD-SSSSS. Digits that are
 # part of a longer number are not a date. For example:
-#   n1850GHGGaxg.cam.h0a.0001-01.nc has one date, 0001-01, so it covers year 1.
+#   N1850GhgGaxg.cam.h0a.0001-01.nc has one date, 0001-01, so it covers year 1.
 #   so_Omon_NorESM3_piControl_r1i1p1f1_gn_000101-001012.nc has two, 000101 and 001012,
 #   so it covers years 1 to 10.
 NAME_DATE = re.compile(r"(?<!\d)(\d{4})(?:\d{2}|\d{4})?(?:-\d{2}(?:-\d{2}(?:-\d{5})?)?)?(?!\d)")
@@ -108,7 +110,7 @@ SCRIPT_ISSUE = re.compile(r"^0*(\d+)\..*\.sh$")
 RUN_SETTINGS = {"RUN_TYPE": "type", "RUN_REFCASE": "refcase", "RUN_REFDATE": "refdate",
                 "RUN_STARTDATE": "startdate"}
 
-# A shell variable given a plain value: refcase="n1850GHGGaxg.LM.nor30b27.002.20261016"
+# A shell variable given a plain value: refcase="NHistGhgGaxg.LM.nor30b29a.r2i1p1f1.020.20261113"
 SHELL_VARIABLE = re.compile(r"""^(?:export\s+)?([A-Za-z_]\w*)=("[^"$`]*"|'[^']*'|[^\s"'$`;]*)\s*(?:#.*)?$""")
 
 # What separates one shell command from the next on a line.
