@@ -1,12 +1,12 @@
-"""The plan and the cost table of the NorESM3 CMIP7 tracker, and the code that builds its
-page. nird_progress.py, next to this module, downloads the spreadsheet's DECK_FASTTRACK tab,
+"""The cost table of the NorESM3 CMIP7 tracker, and the code that builds its page.
+nird_progress.py, next to this module, downloads the spreadsheet's DECK_FASTTRACK tab,
 calls page_text() with it each time it runs, and writes the page as index.html next to
 progress.json.
 
-The runs on the page are the experiments of the spreadsheet that PLAN lists for each
-resolution: all of a tier (DECK, Fast Track), or only some of its activities (ScenarioMIP,
-C4MIP). Each run's members and years come from the sheet's Ensemble Members and
-min_yrs_per_sim columns. With more than one resolution in PLAN, run names carry their resolution.
+The runs on the page are the spreadsheet's experiments at each resolution its Resolution
+column gives, e.g. "LM" or "LM, MM". An experiment with no resolution there is not run.
+Each run's members and years come from the sheet's Ensemble Members and min_yrs_per_sim
+columns. With more than one resolution among the runs, run names carry their resolution.
 
 Each run is assigned a configuration from COSTS. A configuration whose compsets include
 the run's compset at that resolution wins; shell-style wildcards are allowed
@@ -32,15 +32,9 @@ START_MARKER = "let DEFAULT_CONFIGS = ["
 END_MARKER = "let configs = clone(DEFAULT_CONFIGS);"
 NO_PARENT = {"", "-", "obs product"}
 
-# The experiments run at each resolution: for each tier in the spreadsheet's Tier
-# column, either all its experiments, or only those of the activities listed
-# (the activity_id column).
-PLAN = {
-    # At LM: every DECK and every Fast Track experiment.
-    "LM": {"DECK": "all", "Fast Track": "all"},
-    # At MM: every DECK experiment, and of the Fast Track only ScenarioMIP.
-    "MM": {"DECK": "all", "Fast Track": ["ScenarioMIP"]},
-}
+# The spreadsheet's column, L, with the resolutions each experiment is run at, e.g. "LM, MM".
+# It is found by its heading, so the columns before it may change.
+RESOLUTION_COLUMN = "Resolution"
 
 
 def read_experiments(text):
@@ -124,30 +118,29 @@ def config_name(exp, resolution, rules=()):
     return f"NorESM3 {resolution}"
 
 
-def in_plan(exp, tiers):
-    """Whether the plan for a resolution, tiers, runs the experiment: all of its tier, or
-    one of its activities in its tier. An activity_id can name several, e.g. C4MIP/CFMIP."""
-    chosen = tiers.get(exp.get("Tier", "").strip())
-    if chosen == "all":
-        return True
-    activities = [a.strip() for a in exp.get("activity_id", "").split("/")]
-    return bool(chosen) and any(a in chosen for a in activities)
+def resolutions_of(exp):
+    """The resolutions the experiment is run at, from its Resolution column: "LM, MM" is
+    ["LM", "MM"], and an empty cell is none."""
+    return [r.strip().upper() for r in exp.get(RESOLUTION_COLUMN, "").replace("/", ",").split(",")
+            if r.strip()]
 
 
-def build(experiments, costs, plans):
-    """The configurations, the runs and the warnings. plans: as PLAN, the tiers and
-    activities run at each resolution."""
+def build(experiments, costs):
+    """The configurations, the runs and the warnings."""
     configs = [{"id": f"c{i}", "name": c["name"], "costPerYear": c["costPerYear"],
                 "throughput": c["throughput"], "betzyCostPerYear": c.get("betzyCostPerYear"),
                 "betzyThroughput": c.get("betzyThroughput")} for i, c in enumerate(costs, 1)]
     cfg_id = {c["name"]: c["id"] for c in configs}
     rules = compset_rules(costs)
-    label = len(plans) > 1
+    if experiments and RESOLUTION_COLUMN not in experiments[0]:
+        raise ValueError(f"the spreadsheet has no {RESOLUTION_COLUMN} column")
+    resolutions = sorted({r for e in experiments for r in resolutions_of(e)})
+    label = len(resolutions) > 1
 
     warnings = []
     sims = []
-    for resolution, tiers in plans.items():
-        chosen = [e for e in experiments if in_plan(e, tiers)]
+    for resolution in resolutions:
+        chosen = [e for e in experiments if resolution in resolutions_of(e)]
         selected = []
         for e in chosen:
             if config_name(e, resolution, rules) in cfg_id:
@@ -214,8 +207,8 @@ def page_text(sheet_text, sheet):
     instead, if any.
 
     1. It reads the experiments from sheet_text.
-    2. For each resolution in PLAN, it picks the experiments the plan includes. Each becomes
-       a run, e.g. "historical LM".
+    2. For each resolution in the spreadsheet's Resolution column, it picks the experiments
+       that column gives it for. Each becomes a run, e.g. "historical LM".
     3. Each run takes from the spreadsheet its members (Ensemble Members), its years per
        member (min_yrs_per_sim), its start year, the parent it branches from, its MIP (DECK
        runs are grouped under CMIP) and its priority (1 for DECK, 2 for the rest).
@@ -231,7 +224,7 @@ def page_text(sheet_text, sheet):
     CMORization and the measured costs.
 
     Raises ValueError, or OSError, if the page can't be built."""
-    configs, sims, warnings = build(read_experiments(sheet_text), COSTS, PLAN)
+    configs, sims, warnings = build(read_experiments(sheet_text), COSTS)
     with open(TEMPLATE, encoding="utf-8") as f:
         page = f.read()
     s, e = page.find(START_MARKER), page.find(END_MARKER)

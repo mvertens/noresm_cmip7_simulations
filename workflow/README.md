@@ -94,33 +94,25 @@ read by the web page each time the page is opened in a browser.
 | File | What it does | When it is run |
 |---|---|---|
 | `nird_progress.py` | It reads the GitHub issues, the run scripts, the case directories on NIRD and the CMORization directories, and writes `progress.json`. It then downloads the spreadsheet and builds `index.html` from it with `build_scheduler.py`. If anything can't be read or built, it updates neither file. | It is run on NIRD whenever the tracker is to be updated: after new output reaches NIRD, or after the spreadsheet changes. The current plan is to run this as a daily cron job on NIRD. |
-| `build_scheduler.py` | It holds the plan and the cost table, and the code that builds `index.html` from the spreadsheet and `scheduler_template.html`. | It is not run on its own: `nird_progress.py` uses it to build the page. |
+| `build_scheduler.py` | It holds the cost table, and the code that builds `index.html` from the spreadsheet and `scheduler_template.html`. | It is not run on its own: `nird_progress.py` uses it to build the page. |
 | `scheduler_template.html` | It holds the web page's layout, text and JavaScript, and becomes `index.html`. Its JavaScript reads `progress.json` and fills in the tracker. | Its JavaScript runs in the browser each time the web page is opened. |
 
 ### `build_scheduler.py`
 
-`build_scheduler.py` is not run on its own. It holds the plan and the cost
-table, which are changed by editing them there, and the code `nird_progress.py`
-uses to build `index.html` in five steps.
+`build_scheduler.py` is not run on its own. It holds the cost table, which is
+changed by editing it there, and the code `nird_progress.py` uses to build
+`index.html` in five steps.
 
 1. It reads the experiments from the spreadsheet's tab, which
    `nird_progress.py` has downloaded. Rows above the header row, the one with
    an `experiment_id` column, are notes and are skipped.
-2. It chooses which experiments are run at each resolution. `PLAN`, near the
-   top of `build_scheduler.py`, lists for each resolution the tiers from the
-   spreadsheet's Tier column, and for each tier either all its experiments or
-   only those of some of its activities:
-
-   ```python
-   PLAN = {
-       "LM": {"DECK": "all", "Fast Track": "all"},
-       "MM": {"DECK": "all", "Fast Track": ["ScenarioMIP"]},
-   }
-   ```
-
-   That is, every DECK and Fast Track experiment at LM, and at MM every DECK
-   experiment and, of the Fast Track, only ScenarioMIP. The plan is changed by
-   editing it there and running `nird_progress.py` again.
+2. It chooses which experiments are run at each resolution from the
+   spreadsheet's Resolution column, column L. An experiment marked `LM` is run
+   at LM, one marked `LM, MM` at both, and one with nothing there is not run.
+   Each experiment at each of its resolutions is a run, e.g. `historical LM`.
+   The plan is changed in the spreadsheet, and reaches the page at the next run
+   of `nird_progress.py`. The column is found by its heading, `Resolution`, so
+   columns may be added or moved before it.
 3. It gives each run an estimated cost and throughput. The estimates come from
    the `COSTS` table in `build_scheduler.py`, which has one estimate for each
    model configuration, e.g. `NorESM3 LM` for the coupled model at LM

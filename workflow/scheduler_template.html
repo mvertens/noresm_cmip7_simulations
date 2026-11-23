@@ -468,6 +468,9 @@
   .progress-status b{ color: var(--text-primary); }
   .progress-status.is-error{ color: var(--danger); font-weight: 700; }
   .warn-chip{ display:block; width: fit-content; max-width: 100%; box-sizing: border-box; margin-top: 2px; font-size: 11px; line-height: 1.4; padding: 1px 6px; border-radius: 8px; background: var(--danger-wash); color: var(--danger); font-weight: 700; white-space: normal; cursor: default; }
+  /* A warning that opens a panel when clicked sits on its own line, like the others. */
+  #simTables details.cmor-box.warn-box{ display: block; }
+  #simTables details.warn-box .warn-chip{ display: inline-block; cursor: pointer; }
   #simTables .progress-cell:has(.progress-warn:not([hidden])){ flex-wrap: wrap; }
   .progress-warn{ flex-basis: auto; width: fit-content; max-width: 100%; box-sizing: border-box; font-size: 11px; line-height: 1.4; padding: 1px 6px; border-radius: 8px; background: var(--danger-wash); color: var(--danger); font-weight: 700; white-space: normal; }
   /* On its own line under the bar and the years done. */
@@ -1570,6 +1573,24 @@
     return box;
   }
 
+  // A red warning under a case's chips that opens a panel explaining it when clicked, like
+  // a CMORize cell's years: label is the warning, lines the panel's sentences.
+  function warnBox(label, heading, lines){
+    const box = document.createElement("details");
+    box.className = "cmor-box warn-box";
+    const summary = document.createElement("summary");
+    const chip = document.createElement("span"); chip.className = "warn-chip";
+    chip.textContent = label;
+    summary.appendChild(chip);
+    box.appendChild(summary);
+    const pop = document.createElement("div"); pop.className = "cmor-pop";
+    const h = document.createElement("h4"); h.textContent = heading;
+    pop.appendChild(h);
+    lines.forEach(text => { const p = document.createElement("p"); p.textContent = text; pop.appendChild(p); });
+    box.appendChild(pop);
+    return box;
+  }
+
   function placeCmorPop(box){
     const pop = box.querySelector(".cmor-pop"), r = box.querySelector("summary").getBoundingClientRect();
     const w = pop.offsetWidth, h = pop.offsetHeight;
@@ -2126,24 +2147,24 @@
         const auto = autoRun(row);
         const mismatch = ((auto && auto.startMismatch) || []).find(s => s.issue === c.issue);
         if (mismatch){
-          const st = document.createElement("span"); st.className = "warn-chip";
-          st.textContent = "⚠ start date error";
-          st.title = `RUN_STARTDATE in #${c.issue}'s run script: ${mismatch.startdate} (year ${Number(mismatch.startdate.slice(0, 4))})`
-            + `\nStart year in the spreadsheet for ${row.experiment || row.name}: ${mismatch.sheetStart}`
-            + `\nThe years done of ${mismatch.variant} are counted from ${mismatch.startdate}. Correct whichever is wrong.`;
-          pair.appendChild(st);
+          const experiment = row.experiment || row.name;
+          pair.appendChild(warnBox("⚠ start date error", `#${c.issue}, ${experiment} ${mismatch.variant}: start date error`, [
+            `The run script sets RUN_STARTDATE to ${mismatch.startdate}, so this member starts in year ${Number(mismatch.startdate.slice(0, 4))}.`,
+            `The spreadsheet's start_year for ${experiment} is ${mismatch.sheetStart}.`,
+            `The two should agree. The tracker counts the member's years done from RUN_STARTDATE, so its progress follows the run script.`,
+            `Correct whichever is wrong: RUN_STARTDATE in scripts/${c.runScript} on the ${RUNSCRIPTS_BRANCH} branch, or start_year in the spreadsheet.`,
+          ]));
         }
         // The second is for a case whose run script is missing or sets no RUN_STARTDATE.
         if (!c.runScript || !(c.start && c.start.startdate)){
-          const warn = document.createElement("span"); warn.className = "warn-chip";
-          warn.textContent = c.runScript ? "⚠ no RUN_STARTDATE" : "⚠ run script missing";
-          warn.title = (c.runScript
-            ? `#${c.issue}'s run script, scripts/${c.runScript}, could not be read, or it sets no RUN_STARTDATE with xmlchange.`
-            : `#${c.issue} has no run script on the ${RUNSCRIPTS_BRANCH} branch, or more than one script there starts with its issue number. `
-              + `Push it to scripts/<MIP>/<experiment>/, named after the issue, e.g. 011.piControl.LM.beta28.r1i1p1f1.20261102.sh.`)
-            + "\nThe run script is needed to show how the case started, and to count its years done from RUN_STARTDATE."
-            + "\nIf GitHub could not be read when the progress was last updated, every case shows this warning.";
-          pair.appendChild(warn);
+          const why = c.runScript
+            ? [`Its run script, scripts/${c.runScript}, could not be read, or it sets no RUN_STARTDATE with xmlchange.`]
+            : [`It has no run script on the ${RUNSCRIPTS_BRANCH} branch, or more than one script there starts with its issue number.`,
+               `Push it to scripts/<MIP>/<experiment>/, named after the issue, e.g. 011.piControl.LM.beta28.r1i1p1f1.20261102.sh.`];
+          pair.appendChild(warnBox(c.runScript ? "⚠ no RUN_STARTDATE" : "⚠ run script missing",
+            `#${c.issue}: ${c.runScript ? "no RUN_STARTDATE" : "run script missing"}`, [...why,
+              "The run script is needed to show how the case started, and to count its years done from RUN_STARTDATE.",
+              "If GitHub could not be read when the progress was last updated, every case shows this warning."]));
         }
         tdCases.appendChild(pair);
       });
