@@ -157,8 +157,9 @@ happens:
 - GitHub's reply is not a list of issues, each with a number, a title, labels
   and a user, such as when GitHub sends an error message instead.
 - No case issues are read at all.
-- No run scripts are found, a run script can't be read, or a run script is not
-  in an experiment directory, `scripts/<MIP>/<experiment>/`.
+- No run scripts are found, a run script can't be read, an issue has more than
+  one run script, or a run script is not in an experiment directory,
+  `scripts/<MIP>/<experiment>/`.
 - The spreadsheet can't be downloaded, or has no runs in the plan.
 - The page can't be built.
 
@@ -167,28 +168,27 @@ files, and then moves them into place, so that the web page never reads a
 half-written file. For each
 issue, the script also prints one line with the issue's labels, the case's
 latest model date and its start date. A case with no output yet is marked
-"no output on NIRD", or "no run script on GitHub" if its run script is missing
-too.
+"no output on NIRD".
 
 #### Arguments
 
-The script's arguments are needed only for testing a change without touching the
-published page, or for measuring the output again. Each can be combined with the
-others.
+The script's two arguments are needed only for testing a change without
+touching the published page, or for measuring the output again. They can be
+combined.
 
 | Argument | What it does |
 | --- | --- |
 | `out` | Writes `progress.json` here instead of to the published page's directory. `index.html` is written next to it. Use it to try a change to the template, the plan or the script. |
-| `--scripts DIR` | Reads the run scripts from `DIR`, a `scripts/` directory such as in a local checkout of the `CMIP7_Runscripts` branch, instead of from GitHub. Use it to check a run script before pushing it. |
-| `--issues FILE` | Reads the case issues from `FILE`, a JSON file in the form GitHub's API returns them, instead of from GitHub. Use it when GitHub can't be reached. |
-| `--sheet FILE` | Reads the experiments from `FILE`, the spreadsheet's DECK_FASTTRACK tab saved as CSV, instead of downloading it. Use it to try a change to the spreadsheet before making it, or when the spreadsheet can't be reached. The page then says which file it was built from, in bold red. |
 | `--remeasure-storage` | Measures every case's storage on NIRD again. Without it, a case's storage is taken from the last `progress.json` once it covers enough years. Use it after output on NIRD has been deleted or moved. The cost and throughput are not affected: they are read from the timing files on every run. |
 
-For example, the following command writes a test copy of the page to
-`$HOME/tracker_test`, which must exist, from a local checkout of the run scripts.
+The script always reads the issues and the run scripts from GitHub and
+downloads the spreadsheet, so a run script must be pushed, and a change to the
+spreadsheet made, before the tracker can use it. For example, the following
+command writes a test copy of the page to `$HOME/tracker_test`, which must
+exist.
 
 ```bash
-python3 -I workflow/nird_progress.py $HOME/tracker_test/progress.json --scripts ../CMIP7_Runscripts/scripts
+python3 -I workflow/nird_progress.py $HOME/tracker_test/progress.json
 ```
 
 #### Reading GitHub
@@ -222,10 +222,11 @@ several directories fit, the latest is used and the script says so. Until the
 case has a directory on NIRD, the unknown part is shown as `*`.
 
 The issue's title is therefore only a label, and changing it changes nothing.
-An issue with no run script on the
-`CMIP7_Runscripts` branch yet, or whose run script names no case, falls back to
-its title as the case name. When the title and the case name differ, the
-script's line for the issue gives the case name.
+An issue whose run script names no case falls back to its title as the case
+name. When the title and the case name differ, the script's line for the issue
+gives the case name. An issue with no run script on the `CMIP7_Runscripts`
+branch yet is left out, since its experiment is not known, and the script
+prints a line saying so.
 
 Issues with the `test` label are not CMIP7 runs and are left out. An issue's
 title may have only letters, digits, `.`, `-` and `_`. Any other title, such as
@@ -382,8 +383,7 @@ The JavaScript in the web page combines the runs in `index.html` with the cases
 in `progress.json` each time the page is opened. The top of the tracker says
 when `nird_progress.py` last wrote `progress.json`, in NIRD's local time, or in
 bold red why the progress could not be read. The line under it says when the
-spreadsheet the plan was built from was downloaded, or, in bold red, the file
-given with `--sheet` instead. The tracker first shows only
+spreadsheet the plan was built from was downloaded. The tracker first shows only
 the runs that are waiting to start, in progress or completed, and a button
 above the tables shows every run in the plan.
 
@@ -392,12 +392,11 @@ above the tables shows every run in the plan.
   variant label.
 - A member's years done are counted from its start to the latest model date of
   its cases. The start is the earliest `RUN_STARTDATE` in the run scripts of the
-  member's cases, or the spreadsheet's start year if none of its run scripts can
-  be read. When the two years differ, a bold red `⚠ start date error` appears
-  under the case whose run script sets the start; hovering over it shows both
-  years. A case whose run script is missing, or sets no
-  `RUN_STARTDATE`, is followed by a bold red `⚠ run script missing` or
-  `⚠ no RUN_STARTDATE` chip. A member counted from the spreadsheet's start year
+  member's cases, or the spreadsheet's start year if none of its run scripts
+  sets one. When the two years differ, a bold red `⚠ start date error` appears
+  under the case whose run script sets the start; clicking it shows both
+  years. A case whose run script sets no `RUN_STARTDATE` is followed by a bold
+  red `⚠ no RUN_STARTDATE` chip. A member counted from the spreadsheet's start year
   has a bold red note saying so in the Progress column. A member whose issue has the `completed` label
   counts as finished.
 - A run's years done are the mean of its members' years done, over the members

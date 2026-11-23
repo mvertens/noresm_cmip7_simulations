@@ -2160,16 +2160,11 @@
             `Correct whichever is wrong: RUN_STARTDATE in scripts/${c.runScript} on the ${RUNSCRIPTS_BRANCH} branch, or start_year in the spreadsheet.`,
           ]));
         }
-        // The second is for a case whose run script is missing or sets no RUN_STARTDATE.
-        if (!c.runScript || !(c.start && c.start.startdate)){
-          const why = c.runScript
-            ? [`Its run script, scripts/${c.runScript}, could not be read, or it sets no RUN_STARTDATE with xmlchange.`]
-            : [`It has no run script on the ${RUNSCRIPTS_BRANCH} branch, or more than one script there starts with its issue number.`,
-               `Push it to scripts/<MIP>/<experiment>/, named after the issue, e.g. 011.piControl.LM.beta28.r1i1p1f1.20261102.sh.`];
-          pair.appendChild(warnBox(c.runScript ? "⚠ no RUN_STARTDATE" : "⚠ run script missing",
-            `#${c.issue}: ${c.runScript ? "no RUN_STARTDATE" : "run script missing"}`, [...why,
-              "The run script is needed to show how the case started, and to count its years done from RUN_STARTDATE.",
-              "If GitHub could not be read when the progress was last updated, every case shows this warning."]));
+        // The second is for a case whose run script sets no RUN_STARTDATE.
+        if (!(c.start && c.start.startdate)){
+          pair.appendChild(warnBox("⚠ no RUN_STARTDATE", `#${c.issue}: no RUN_STARTDATE`, [
+            `Its run script, scripts/${c.runScript} on the ${RUNSCRIPTS_BRANCH} branch, sets no RUN_STARTDATE with xmlchange, or sets it from a value only known when the script runs.`,
+            "The run script's RUN_STARTDATE is needed to show how the case started, and to count its years done from it."]));
         }
         tdCases.appendChild(pair);
       });
@@ -2492,9 +2487,8 @@
     const unmatched = (data.skipped || []).map(s => `#${s.issue}, ${s.reason}`);
     sims.forEach(r => { delete r.cases; delete r.owner; delete r.machine; });
     data.cases.forEach(c => {
-      const row = c.experiment && sims.find(r => r.resolution === c.resolution && r.experiment === c.experiment);
-      if (!c.experiment) unmatched.push(`#${c.issue}, no run script on GitHub, so its experiment is not known`);
-      else if (!row) unmatched.push(`#${c.issue}, its run script's experiment, ${c.experiment}, is not in the plan at ${c.resolution}`);
+      const row = sims.find(r => r.resolution === c.resolution && r.experiment === c.experiment);
+      if (!row) unmatched.push(`#${c.issue}, its run script's experiment, ${c.experiment}, is not in the plan at ${c.resolution}`);
       else if (!c.variant) unmatched.push(`#${c.issue}, the issue needs a variant label, e.g. r1i1p1f1`);
       else { c.runName = row.name; (row.cases = row.cases || []).push(c); }
     });
@@ -2531,17 +2525,14 @@
   }
   const updatedOn = data => `<b>${String(data.updated || "an unknown time").replace(/[<>&]/g, "")}</b>`;
 
-  // The line under it: when the spreadsheet the plan was built from was read, or the file it
-  // was read from instead, which only a test run uses.
+  // The line under it: when the spreadsheet the plan was built from was read.
   (() => {
-    const p = el("sheetStatus"), s = DEFAULT_SHEET;
+    const p = el("sheetStatus");
+    const s = DEFAULT_SHEET;
     if (!s){ p.hidden = true; return; }
     const clean = v => String(v).replace(/[<>&"]/g, "");
     const sheet = `<a href="${clean(s.url)}" target="_blank" rel="noopener">NorESM3 CMIP7 experiments spreadsheet</a>`;
-    p.innerHTML = s.file
-      ? `⚠ Plan built from <b>${clean(s.file)}</b>, a copy of the ${sheet}, at <b>${clean(s.read)}</b>.`
-      : `Plan built from the ${sheet} as read at <b>${clean(s.read)}</b>.`;
-    p.classList.toggle("is-error", !!s.file);
+    p.innerHTML = `Plan built from the ${sheet} as read at <b>${clean(s.read)}</b>.`;
   })();
 
   applyAutoProgress(DEFAULT_PROGRESS);

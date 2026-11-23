@@ -173,7 +173,7 @@ def check_issues(issues, source):
     a number, a title, labels and a user. Anything else, such as an error message GitHub sent
     instead, would otherwise give a page with wrong or missing runs.
 
-    issues: what was read as a list of issues, from GitHub's API or from the --issues file.
+    issues: what GitHub's API gave as one page of a repository's issues.
     source: where it was read from, for the message, such as "GitHub's page 2 of
       NorESMhub/CMIP7_CMOR-Publish's issues"."""
     if not isinstance(issues, list):
@@ -202,19 +202,12 @@ def fetch_issues(repo):
         page += 1
 
 
-def list_run_scripts(repo, scripts_dir=None):
-    """The run scripts' paths below scripts/, as (paths, None), or (None, why) if they
-    couldn't be listed.
+def list_run_scripts(repo):
+    """The run scripts' paths below scripts/ on GitHub, as (paths, None), or (None, why) if
+    they couldn't be listed.
 
-    repo: the repository, as owner/name, whose CMIP7_Runscripts branch has the run scripts.
-    scripts_dir: a local scripts/ directory to list instead, from --scripts; None to list the
-      branch on GitHub."""
+    repo: the repository, as owner/name, whose CMIP7_Runscripts branch has the run scripts."""
     try:
-        if scripts_dir:
-            if not os.path.isdir(scripts_dir):
-                return None, f"{scripts_dir} is not a directory"
-            return [os.path.relpath(os.path.join(d, f), scripts_dir)
-                    for d, _, files in os.walk(scripts_dir) for f in files if f.endswith(".sh")], None
         tree = github_api(f"https://api.github.com/repos/{repo}/git/trees/{RUNSCRIPTS_BRANCH}?recursive=1")["tree"]
         return [t["path"][len("scripts/"):] for t in tree
                 if t["type"] == "blob" and t["path"].startswith("scripts/") and t["path"].endswith(".sh")], None
@@ -222,25 +215,19 @@ def list_run_scripts(repo, scripts_dir=None):
         return None, str(getattr(e, "reason", None) or e)
 
 
-def read_run_script(repo, path, scripts_dir=None):
-    """The text of one run script, as (text, None), or (None, why) if it couldn't be read.
+def read_run_script(repo, path):
+    """The text of one run script on GitHub, as (text, None), or (None, why) if it couldn't
+    be read.
 
     repo: the repository, as owner/name, whose CMIP7_Runscripts branch has the run script.
     path: the run script's path below scripts/, as list_run_scripts() gives it, such as
-      DECK/piControl/011.piControl.LM.beta28.r1i1p1f1.20261102.sh.
-    scripts_dir: a local scripts/ directory to read it from instead, from --scripts; None to
-      read it from GitHub."""
+      CMIP/piControl/011.piControl.LM.beta28.r1i1p1f1.20261102.sh."""
     try:
-        if scripts_dir:
-            with open(os.path.join(scripts_dir, path), encoding="utf-8", errors="replace") as f:
-                return f.read(), None
         url = (f"https://raw.githubusercontent.com/{repo}/{RUNSCRIPTS_BRANCH}/scripts/"
                + urllib.parse.quote(path))
         req = urllib.request.Request(url, headers={"User-Agent": "nird_progress"})
         with urllib.request.urlopen(req, timeout=30) as r:
             return r.read().decode("utf-8", errors="replace"), None
-    except FileNotFoundError:
-        return None, f"not found at scripts/{path}"
     except urllib.error.HTTPError as e:
         return None, f"not found at scripts/{path}" if e.code == 404 else f"not read, HTTP {e.code}"
     except (OSError, http.client.HTTPException) as e:
@@ -765,20 +752,16 @@ def case_timing(directory):
 
 
 def main():
-    # On NIRD the script is run with no arguments. They are for testing a change without
-    # touching the published page, and for measuring the storage again.
-    """Reads the case issues, their run scripts, the case directories on NIRD and the
-    spreadsheet, and writes progress.json and the page. It takes its inputs from the command
-    line; on NIRD, there are none. Raises Failed, and writes nothing, if anything it needs can't
-    be read or the page can't be built."""
+    """Reads the case issues and the CMORization issues on GitHub, the run scripts on the
+    CMIP7_Runscripts branch, the case directories on NIRD and the spreadsheet, and writes
+    progress.json and the page. Raises Failed, and writes nothing, if anything it needs can't
+    be read or the page can't be built.
+
+    On NIRD the script is run with no arguments. Its two arguments are for testing a change
+    without touching the published page, and for measuring the storage again."""
     parser = argparse.ArgumentParser()
     parser.add_argument("out", nargs="?", default=PROGRESS,
                         help=f"where to write progress.json; the page, index.html, goes next to it (default {PROGRESS})")
-    parser.add_argument("--sheet", help="read the experiments from this CSV file, the spreadsheet's "
-                                        "DECK_FASTTRACK tab, instead of from the spreadsheet")
-    parser.add_argument("--issues", help="read the case issues from this JSON file instead of GitHub")
-    parser.add_argument("--scripts", help="read the run scripts from this scripts/ directory, e.g. in a "
-                                          "checkout of the CMIP7_Runscripts branch, instead of GitHub")
     parser.add_argument("--remeasure-storage", action="store_true",
                         help="measure every case's storage on NIRD again, instead of keeping what the "
                              "last progress.json has for it; the cost and throughput are read again "
@@ -796,20 +779,14 @@ def main():
         except (OSError, ValueError, KeyError, TypeError):
             pass
 
-    if args.issues:
-        with open(args.issues, encoding="utf-8") as f:
-            issues = json.load(f)
-        check_issues(issues, args.issues)
-        issues = [i for i in issues if "pull_request" not in i]
-    else:
-        try:
-            issues = fetch_issues(REPO)
-        except (OSError, ValueError, http.client.HTTPException) as e:
-            raise Failed(f"The case issues in {REPO} could not be read: {e}") from e
+    try:
+        issues = fetch_issues(REPO)
+    except (OSError, ValueError, http.client.HTTPException) as e:
+        raise Failed(f"The case issues in {REPO} could not be read: {e}") from e
     # The repository always has case issues, so none means GitHub's reply was wrong, and a
     # page without them would show no progress at all.
     if not issues:
-        raise Failed(f"No issues were read from {args.issues or REPO}.")
+        raise Failed(f"No issues were read from {REPO}.")
     # Only an issue whose title is a name, of letters, digits, ".", "-" and "_", is a case.
     # Any other title, such as one with a space, is a note or a placeholder for a run not
     # set up yet, and the issue is left out.
@@ -827,22 +804,24 @@ def main():
     except (OSError, ValueError, http.client.HTTPException) as e:
         raise Failed(f"The CMORization issues in {CMOR_REPO} could not be read: {e}") from e
     # A case's run script is the one whose name starts with its issue number.
-    scripts, why = list_run_scripts(REPO, args.scripts)
+    scripts, why = list_run_scripts(REPO)
     if scripts is None:
         raise Failed(f"The run scripts could not be listed: {why}")
     if not scripts:
-        raise Failed(f"No run scripts were found in {args.scripts or REPO + ' ' + RUNSCRIPTS_BRANCH}.")
+        raise Failed(f"No run scripts were found in scripts/ on the {RUNSCRIPTS_BRANCH} branch of {REPO}.")
     scripts_of_issue = {}
     for path in sorted(scripts):
         if m := SCRIPT_ISSUE.match(os.path.basename(path)):
             scripts_of_issue.setdefault(int(m.group(1)), []).append(path)
 
-    # Each issue's case name is the one its run script gives create_newcase, so the issue's
-    # title doesn't have to be the case name. The part of the name the script only knows
-    # when it runs, such as $(date), comes from the case's directory on NIRD. An issue with
-    # no run script, or whose script names no case, falls back to its title. The case's
-    # experiment is the directory its run script is in, scripts/<MIP>/<experiment>/.
+    # Each issue's case is set up by its run script. The case name is the one the script gives
+    # create_newcase, so the issue's title doesn't have to be the case name. The part of the
+    # name the script only knows when it runs, such as $(date), comes from the case's
+    # directory on NIRD. A script that names no case falls back to the issue's title. The
+    # case's experiment is the directory its run script is in, scripts/<MIP>/<experiment>/.
+    # An issue with no run script yet is left out, since its experiment is not known.
     tracked = []
+    skipped = []
     for issue in sorted(issues, key=lambda i: i["number"]):
         num = issue["number"]
         title = issue["title"].strip()
@@ -850,38 +829,44 @@ def main():
         if "test" in labels:
             continue
         script_paths = scripts_of_issue.get(num, [])
-        text = None
+        if not script_paths:
+            reason = (f"no run script yet: no script in scripts/ on the {RUNSCRIPTS_BRANCH} branch "
+                      f"has a name starting with its issue number, {num:03d}")
+            skipped.append({"issue": num, "title": title, "reason": reason})
+            print(f"#{num} {title}: skipped, {reason}")
+            continue
+        if len(script_paths) > 1:
+            raise Failed(f"#{num} has more than one run script: " + ", ".join(script_paths)
+                         + ". Only one script's name may start with its issue number.")
+        script = script_paths[0]
+        parts = script.split("/")
+        if len(parts) != 3:
+            raise Failed(f"#{num}'s run script, scripts/{script}, is not in an experiment directory: "
+                         "run scripts go in scripts/<MIP>/<experiment>/.")
+        experiment = parts[1]
+        text, why = read_run_script(REPO, script)
+        if text is None:
+            raise Failed(f"#{num}'s run script, scripts/{script}, could not be read: {why}")
         name = None
-        experiment = None
         notes = []
-        if len(script_paths) == 1:
-            parts = script_paths[0].split("/")
-            if len(parts) != 3:
-                raise Failed(f"#{num}'s run script, scripts/{script_paths[0]}, is not in an experiment "
-                             "directory: run scripts go in scripts/<MIP>/<experiment>/.")
-            experiment = parts[1]
-            text, why = read_run_script(REPO, script_paths[0], args.scripts)
-            if text is None:
-                raise Failed(f"#{num}'s run script, scripts/{script_paths[0]}, could not be read: {why}")
-            if pattern := script_case_name(text):
-                name, fits = find_case(pattern, CASE_DIR)
-                if len(fits) > 1:
-                    notes.append("more than one case directory fits its run script: " + ", ".join(fits)
-                                 + f"; {name} is used")
-                if not name:
-                    # Nothing on NIRD yet: the name as far as the script knows it.
-                    name = pattern.replace(UNKNOWN, "*")
-            else:
-                notes.append("its run script names no case; the title is used")
-        tracked.append((issue, num, title, labels, script_paths, text, name or title, experiment, notes))
+        if pattern := script_case_name(text):
+            name, fits = find_case(pattern, CASE_DIR)
+            if len(fits) > 1:
+                notes.append("more than one case directory fits its run script: " + ", ".join(fits)
+                             + f"; {name} is used")
+            if not name:
+                # Nothing on NIRD yet: the name as far as the script knows it.
+                name = pattern.replace(UNKNOWN, "*")
+        else:
+            notes.append("its run script names no case; the title is used")
+        tracked.append((issue, num, title, labels, script, text, name or title, experiment, notes))
     # A case's parent is the issue whose case is its RUN_REFCASE.
     issue_of_case = {name: num for _, num, _, _, _, _, name, _, _ in tracked}
 
     cases = []
-    skipped = []
     # Each case's validation report, by case name, to be copied next to progress.json.
     reports = {}
-    for issue, num, title, labels, script_paths, text, name, experiment, notes in tracked:
+    for issue, num, title, labels, script, text, name, experiment, notes in tracked:
         m = TITLE.match(name)
         if not m:
             skipped.append({"issue": num, "title": title, "reason": f"{name} is not a case name"})
@@ -894,10 +879,8 @@ def main():
         # completed or on ESGF.
         variant = next((l for l in labels if VARIANT.match(l)), None)
         case = {"issue": num, "case": name, "resolution": RESOLUTION[m.group(1)],
-                "version": m.group(2), "owner": ", ".join(people), "labels": labels,
-                "completed": "completed" in labels}
-        if experiment:
-            case["experiment"] = experiment
+                "version": m.group(2), "experiment": experiment, "owner": ", ".join(people),
+                "labels": labels, "completed": "completed" in labels}
         if variant:
             case["variant"] = variant
         found_dates = model_dates(HIST_DIR.format(case=name), HIST_PATTERN)
@@ -913,25 +896,20 @@ def main():
         output = {}
         if os.path.isdir(d := CMIP7PREP_DIR.format(case=name)):
             output["cmip7prep"] = d
-        if experiment and variant:
+        if variant:
             d = CMOR4CMIP7_DIR.format(resolution=case["resolution"], experiment=experiment, variant=variant)
             if os.path.isdir(d):
                 output["cmor4cmip7"] = d
         if output:
             case["cmorOutput"] = output
-        # Problems with the run script are printed with the case's line.
-        problems = notes
-        if len(script_paths) > 1:
-            problems.append("more than one run script: " + ", ".join(script_paths))
-        elif script_paths:
-            case["runScript"] = script_paths[0]
-            if start := run_settings(text):
-                # The parent's case name may still have a * for a part only NIRD knows.
-                refcase = start.get("refcase", "")
-                if parent := issue_of_case.get(refcase) or next(
-                        (n for c, n in issue_of_case.items() if "*" in c and name_pattern(c, "*").match(refcase)), None):
-                    start["parent"] = parent
-                case["start"] = start
+        case["runScript"] = script
+        if start := run_settings(text):
+            # The parent's case name may still have a * for a part only NIRD knows.
+            refcase = start.get("refcase", "")
+            if parent := issue_of_case.get(refcase) or next(
+                    (n for c, n in issue_of_case.items() if "*" in c and name_pattern(c, "*").match(refcase)), None):
+                start["parent"] = parent
+            case["start"] = start
         if found := [i for i in cmor_issues if name in i["title"] + "\n" + (i.get("body") or "")]:
             case["cmorIssues"] = []
             for i in found:
@@ -978,11 +956,10 @@ def main():
             report = f"at {case['modelDate']}"
             if startdate := case.get("start", {}).get("startdate"):
                 report += f"; start date {startdate}"
-        elif not script_paths:
-            report = "no run script on GitHub"
         else:
             report = "no output on NIRD" if found_dates is False else "no dated files"
-        print(f"#{num} {title} [{', '.join(labels) or 'no labels'}]: " + "; ".join([report] + problems))
+        # Problems with the run script are printed with the case's line.
+        print(f"#{num} {title} [{', '.join(labels) or 'no labels'}]: " + "; ".join([report] + notes))
 
     # When the progress was written, in NIRD's local time with its time zone, e.g. CET.
     now = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
@@ -991,14 +968,9 @@ def main():
     # template; it reads progress.json when it is opened. It is built before anything is
     # written, so that if it can't be built neither file is updated.
     page = os.path.join(os.path.dirname(os.path.abspath(args.out)), "index.html")
-    sheet = {"url": f"{SHEET}/edit?gid={SHEET_TAB}#gid={SHEET_TAB}", "read": now, "file": None}
+    sheet = {"url": f"{SHEET}/edit?gid={SHEET_TAB}#gid={SHEET_TAB}", "read": now}
+    sheet_text = fetch_sheet()
     try:
-        if args.sheet:
-            with open(args.sheet, encoding="utf-8") as f:
-                sheet_text = f.read()
-            sheet["file"] = os.path.basename(args.sheet)
-        else:
-            sheet_text = fetch_sheet()
         text, _, sims, warnings = build_scheduler.page_text(sheet_text, sheet)
     except (OSError, ValueError) as e:
         raise Failed(f"The page could not be built: {e}") from e

@@ -234,8 +234,7 @@ def page_text(sheet_text, sheet):
 
     sheet_text: the CSV text of the spreadsheet's DECK_FASTTRACK tab.
     sheet: where sheet_text came from, for the line on the page: {"url": the spreadsheet's
-      address, "read": when it was read, "file": the --sheet file it was read from instead, if
-      it was}.
+      address, "read": when it was read}.
 
     1. It reads the experiments from sheet_text.
     2. For each resolution in the spreadsheet's Resolution column, it picks the experiments
