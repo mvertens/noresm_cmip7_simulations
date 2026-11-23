@@ -314,18 +314,28 @@ the next case's `RUN_STARTDATE`, along with the problems in those years.
 #### Output size
 
 The Cost plan estimates the storage each run will need. The script therefore
-measures how much space each case already takes up on NIRD for each simulated
-year, in the following four parts.
+measures how much space each case already takes up on NIRD, in GiB (2³⁰ bytes),
+the binary unit NIRD's quotas use; the Cost plan shows TiB. There are four parts.
 
 - The history files are in each component's `hist/` directory.
-- The restart files are in `rest/`.
 - The time series are the netCDF files that cmip7-prep writes outside `cmor/`.
 - The CMORized files are those written by cmip7-prep and cmor4cmip7.
+- The restart files are in `rest/`, one directory for each restart set, named
+  after its date, e.g. `0101-01-01-00000`.
 
-The Cost plan multiplies these sizes by each run's number of members and years.
-Measuring takes a long time, so a size that has already been measured over at
-least five years is kept from the previous `progress.json`, as long as the issue's
-case is the same; a case whose name has changed is measured again. To measure every case
+For history, time series and CMORized files, the script records the GiB per
+simulated year, and the Cost plan multiplies it by each run's number of members
+and years. Restarts are not kept for every year, so they are counted by set
+instead: the script records the mean size of one set and the years between one
+set and the next, from the sets' dates. The Cost plan then counts, for each
+member, one set for every so many years of the run, or a single set if the case
+keeps only one, and multiplies by the size of a set.
+
+Measuring takes a long time, so a history, time series or CMOR size that has
+already been measured over at least five years is kept from the previous
+`progress.json`, as long as the issue's case is the same; a case whose name has
+changed is measured again. Restarts are measured on every run, since only the
+files' sizes are read. To measure every case
 again, for example after output on NIRD has been deleted or moved, or after a
 change to the history output, run the script once with `--remeasure-storage`. These
 sizes are the storage only: the cost comes from the timing files, which are read

@@ -80,6 +80,12 @@ CMOR_TIME = re.compile(r"_(\d{4,14})-(\d{4,14})\.nc$")
 # A kind of output measured over at least this many years is not measured again.
 STORAGE_YEARS = 5
 
+# Sizes are in binary units, as NIRD's quotas are: GiB here, and TiB on the page.
+BYTES_PER_GIB = 2**30
+
+# A restart set's directory in rest/, named after its date: 0101-01-01-00000.
+REST_SET = re.compile(r"^(\d{4})-(\d{2})-(\d{2})-\d{5}$")
+
 # Finds the dates in a file's name, so that file_years() can tell which model years the
 # file covers. Only the year of each date is kept. A date is written in one of these
 # forms: YYYY, YYYYMM, YYYYMMDD, YYYY-MM, YYYY-MM-DD or YYYY-MM-DD-SSSSS. Digits that are
@@ -477,15 +483,15 @@ def file_years(name):
 
 
 def output_size(paths, case):
-    """{gb, years} for the netCDF files: their size, and how many model years their names
-    cover; None if there are no dated ones."""
+    """{gib, years} for the netCDF files: their size in GiB, and how many model years their
+    names cover; None if there are no dated ones."""
     years = set()
     total = 0
     for path in paths:
         if path.endswith(".nc") and (ys := file_years(os.path.basename(path).replace(case, ""))):
             years.update(ys)
             total += size(path)
-    return {"gb": round(total / 1e9, 3), "years": len(years)} if years else None
+    return {"gib": round(total / BYTES_PER_GIB, 3), "years": len(years)} if years else None
 
 
 def files_below(directory, skip=None):
@@ -500,25 +506,55 @@ def files_below(directory, skip=None):
 
 def settled_storage(storage):
     """The kinds of a case's earlier measurement to keep: those with at least
-    STORAGE_YEARS years, by then a steady rate. History counts its longest component, and
-    CMOR is kept tool by tool."""
+    STORAGE_YEARS years, by then a steady rate, and in GiB. History counts its longest
+    component, and CMOR is kept tool by tool. Restarts are measured on every run."""
     storage = storage if isinstance(storage, dict) else {}
-    kept = {k: v for k, v in storage.items()
-            if k in ("rest", "timeseries") and isinstance(v, dict) and v.get("years", 0) >= STORAGE_YEARS}
-    if max((s.get("years", 0) for s in storage.get("hist", {}).values()), default=0) >= STORAGE_YEARS:
-        kept["hist"] = storage["hist"]
-    if cmor := {t: s for t, s in storage.get("cmor", {}).items() if s.get("years", 0) >= STORAGE_YEARS}:
+
+    def settled(v):
+        return isinstance(v, dict) and "gib" in v and v.get("years", 0) >= STORAGE_YEARS
+
+    kept = {}
+    if settled(storage.get("timeseries")):
+        kept["timeseries"] = storage["timeseries"]
+    hist = storage.get("hist") if isinstance(storage.get("hist"), dict) else {}
+    if hist and all("gib" in v for v in hist.values()) and any(settled(v) for v in hist.values()):
+        kept["hist"] = hist
+    cmor = storage.get("cmor") if isinstance(storage.get("cmor"), dict) else {}
+    if cmor := {t: v for t, v in cmor.items() if settled(v)}:
         kept["cmor"] = cmor
     return kept
 
 
+def restart_sets(rest):
+    """The restart sets kept in rest/, as {gib, sets, setGib, everyYears}: their total size,
+    how many there are, the mean size of one, and the years between one set and the next,
+    from the dates the sets' directories are named after (None with fewer than two sets).
+    rest/ with files but no dated directories is one set. None if rest/ is empty."""
+    if not os.path.isdir(rest):
+        return None
+    dated = sorted(d for d in os.listdir(rest) if REST_SET.match(d) and os.path.isdir(os.path.join(rest, d)))
+    paths = files_below(rest)
+    if not paths:
+        return None
+    total = sum(map(size, paths)) / BYTES_PER_GIB
+    sets = max(len(dated), 1)
+    every = None
+    if len(dated) > 1:
+        # A date as a fractional year: 0101-07-01 is 101.5.
+        when = [int(m.group(1)) + (int(m.group(2)) - 1) / 12 + (int(m.group(3)) - 1) / 365
+                for m in map(REST_SET.match, dated)]
+        gaps = sorted(b - a for a, b in zip(when, when[1:]))
+        every = round(gaps[len(gaps) // 2], 2)
+    return {"gib": round(total, 3), "sets": sets, "setGib": round(total / sets, 3), "everyYears": every}
+
+
 def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, labels, kept=None):
-    """How much output the case has on NIRD, as {gb, years} for each kind: hist, a dict by
-    component of the <component>/hist directories; rest, the restart sets in rest/, over the
-    years the history covers; timeseries, cmip7-prep's time series, the files in its
-    directory outside cmor/; and cmor, by tool, the CMOR files, each version's years
-    counted. The kinds in kept, from an earlier run, are not measured again. A kind with
-    nothing on NIRD is left out."""
+    """How much output the case has on NIRD, in GiB: as {gib, years} for hist, a dict by
+    component of the <component>/hist directories; timeseries, cmip7-prep's time series, the
+    files in its directory outside cmor/; and cmor, by tool, the CMOR files, each version's
+    years counted. rest is the restart sets in rest/, as restart_sets() gives them. The kinds
+    in kept, from an earlier run, are not measured again. A kind with nothing on NIRD is left
+    out."""
     kept = kept or {}
     storage = {k: v for k, v in kept.items() if k != "cmor"}
     if case_dir and os.path.isdir(case_dir):
@@ -529,9 +565,8 @@ def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, labels, kept=None):
                     hist[comp] = s
             if hist:
                 storage["hist"] = hist
-        years = max((s["years"] for s in storage.get("hist", {}).values()), default=0)
-        if "rest" not in storage and years and (rest := files_below(os.path.join(case_dir, "rest"))):
-            storage["rest"] = {"gb": round(sum(map(size, rest)) / 1e9, 3), "years": years}
+        if rest := restart_sets(os.path.join(case_dir, "rest")):
+            storage["rest"] = rest
     if "timeseries" not in storage and prep_dir and (s := output_size(files_below(prep_dir, skip="cmor"), case)):
         storage["timeseries"] = s
     cmor = dict(kept.get("cmor", {}))
@@ -544,7 +579,7 @@ def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, labels, kept=None):
                 by_version.setdefault(v, set()).update(range(int(m.group(2)), int(m.group(3)) + 1))
                 total += b
             if years := sum(len(ys) for ys in by_version.values()):
-                cmor[tool] = {"gb": round(total / 1e9, 3), "years": years}
+                cmor[tool] = {"gib": round(total / BYTES_PER_GIB, 3), "years": years}
     if cmor:
         storage["cmor"] = cmor
     return storage
