@@ -190,7 +190,8 @@ def build(experiments, costs):
             sims.append({
                 "id": sim_id[name],
                 "name": f"{name} {resolution}" if label else name,
-                # The page matches a case's issue to its run by experiment label and resolution.
+                # The page matches a case to its run by its experiment, the directory of its
+                # run script, and its resolution.
                 # It counts years done from the cases' RUN_STARTDATE, and from the start year
                 # only while no run script can be read.
                 "experiment": name,

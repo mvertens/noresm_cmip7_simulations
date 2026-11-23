@@ -50,7 +50,9 @@ read by the web page each time the page is opened in a browser.
   [scripts](https://github.com/NorESMhub/noresm_cmip7_simulations/tree/CMIP7_Runscripts/scripts)
   sub-directory directory on this repository's `CMIP7_Runscripts`
   branch. There is one run script for each case, and the name of each
-  run script starts with the number of its case issue.
+  run script starts with the number of its case issue. Each run script is in
+  `scripts/<MIP>/<experiment>/`, such as `scripts/CMIP/piControl/`, and this
+  directory gives the case's experiment.
 
 - **The CMORization issues**
 
@@ -73,6 +75,8 @@ read by the web page each time the page is opened in a browser.
   cmor4cmip7 writes the CMORized ocean and ocean biogeochemistry output of each
   simulation to
   `/nird/datapeak/NS9034K/.CMIP7/NorESM3-<resolution>/<experiment>/<variant>`.
+  The experiment is the directory of the case's run script, such as
+  `piControl`, and the variant is the case issue's label, such as `r1i1p1f1`.
   When a simulation is continued in a new case, cmor4cmip7 writes the output of
   all of the simulation's cases to this one directory.
 
@@ -153,7 +157,8 @@ happens:
 - GitHub's reply is not a list of issues, each with a number, a title, labels
   and a user, such as when GitHub sends an error message instead.
 - No case issues are read at all.
-- No run scripts are found, or a run script can't be read.
+- No run scripts are found, a run script can't be read, or a run script is not
+  in an experiment directory, `scripts/<MIP>/<experiment>/`.
 - The spreadsheet can't be downloaded, or has no runs in the plan.
 - The page can't be built.
 
@@ -229,10 +234,23 @@ left out as soon as the issues are read, before anything from it is used. An iss
 `compset.LM.nor30b28...` is also left out. For each issue left out, the script
 prints a line saying why.
 
-The web page shows a case once its issue has an experiment label for a run in
-the plan and a variant label, e.g. `historical` and `r2i1p1f1`. Until then, the
-issue is listed under "Not shown" below the tracker, together with the issues
-whose case names are not of that form.
+#### The case's experiment and labels
+
+A case's experiment is the directory its run script is in,
+`scripts/<MIP>/<experiment>/`: the script of #11,
+`scripts/CMIP/piControl/011.piControl.LM.beta28.r1i1p1f1.20261102.sh`, makes
+it a piControl case. A run script anywhere else stops the script, and nothing
+is updated. The issue's labels give only:
+
+- the variant, such as `r2i1p1f1`;
+- `completed`, once the run has finished;
+- `esgf`, once its data is on ESGF;
+- `test`, for a case that is not a CMIP7 run, which is left out.
+
+The web page shows a case once its experiment is a run in the plan at its
+resolution and its issue has a variant label. Until then, the issue is listed
+under "Not shown" below the tracker, together with the issues with no run
+script yet and those whose case names are not of the form above.
 
 The case's owner is the person assigned to the issue. If several people are
 assigned, all of them are owners, and the tracker shows them all, separated by
@@ -369,8 +387,9 @@ given with `--sheet` instead. The tracker first shows only
 the runs that are waiting to start, in progress or completed, and a button
 above the tables shows every run in the plan.
 
-- A run's cases are the issues with the run's experiment label and resolution.
-  The cases are grouped into members by their variant label.
+- A run's cases are those with the run's experiment, from their run scripts'
+  directory, and resolution. The cases are grouped into members by their
+  variant label.
 - A member's years done are counted from its start to the latest model date of
   its cases. The start is the earliest `RUN_STARTDATE` in the run scripts of the
   member's cases, or the spreadsheet's start year if none of its run scripts can

@@ -47,7 +47,8 @@ CASE_DIR = "/nird/datalake/NS9560K/noresm3/cases/{case}"
 HIST_DIR = CASE_DIR + "/atm/hist"
 HIST_PATTERN = "*.cam.i.*.nc"
 
-# Each tool's output, for a case whose issue gives no output root.
+# Each tool's CMORized output: cmip7-prep's for each case, and cmor4cmip7's for each
+# simulation, shared by all its cases.
 CMIP7PREP_DIR = CASE_DIR + ".cmor"
 CMOR4CMIP7_DIR = "/nird/datapeak/NS9034K/.CMIP7/NorESM3-{resolution}/{experiment}/{variant}"
 
@@ -91,27 +92,6 @@ REST_SET = re.compile(r"^(\d{4})-(\d{2})-(\d{2})-\d{5}$")
 #   so_Omon_NorESM3_piControl_r1i1p1f1_gn_000101-001012.nc has two, 000101 and 001012,
 #   so it covers years 1 to 10.
 NAME_DATE = re.compile(r"(?<!\d)(\d{4})(?:\d{2}|\d{4})?(?:-\d{2}(?:-\d{2}(?:-\d{5})?)?)?(?!\d)")
-
-
-def entry(label, value):
-    r"""A regular expression for one entry of an issue's description, whose group 1 is the
-    entry's value. The entry is "- label: value" on one line, with the label in bold or not, or
-    a heading, "### label", with the value on the next line that isn't blank.
-
-    label: a regular expression for the entry's label, such as r"cmor[ \t]+data[ \t]+version".
-    value: a regular expression for the entry's value, such as r"v?\d{8}\b"."""
-    return re.compile(r"^[ \t]*(?:[-*+][ \t]+|#{1,6}[ \t]*)?(?:\*\*)?" + label
-                      + r"(?:\*\*)?[ \t]*:?[ \t]*(?:\*\*)?\s*`?(" + value + r")", re.M | re.I)
-
-
-# Where each tool's CMORized output is, when it isn't in the default place:
-# "- cmip7prep output root: /nird/...".
-OUTPUT_ROOTS = {tool: entry(tool + r"[ \t]+output(?:[ \t]+root)?", r"/[^\s`]+")
-                for tool in ("cmip7prep", "cmor4cmip7")}
-
-# The version the case's years are CMORized into, with or without the v:
-# "- cmor data version: v20261028".
-DATA_VERSION = entry(r"cmor[ \t]+data[ \t]+version", r"v?\d{8}\b")
 
 # The CMORization issues, each naming the cases it CMORizes, and the CMOR tag version in its
 # description, on the line after its label: "**cmor tag version (decided by ...)**\n20261109".
@@ -626,7 +606,7 @@ def restart_sets(rest):
     return {"gib": round(total, 3), "sets": sets, "setGib": round(total / sets, 3), "everyYears": every}
 
 
-def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, labels, kept=None):
+def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, experiment, variant, kept=None):
     """How much output the case has on NIRD, in GiB: as {gib, years} for hist, a dict by
     component of the <component>/hist directories; timeseries, cmip7-prep's time series, the
     files in its directory outside cmor/; and cmor, by tool, the CMOR files, each version's
@@ -637,8 +617,9 @@ def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, labels, kept=None):
     case: the case's name.
     prep_dir: cmip7-prep's output directory for the case; None if it has none.
     cmor4cmip7_dir: cmor4cmip7's output directory for the case; None if it has none.
-    labels: the names of the case issue's labels, such as ["piControl", "r1i1p1f1"], which
-      pick the case's CMOR files, as in case_files().
+    experiment: the case's experiment, such as piControl, which with the variant picks the
+      case's CMOR files, as in case_files().
+    variant: the case's variant, such as r1i1p1f1.
     kept: the kinds of the last run's measurement to keep instead of measuring them again, as
       settled_storage() gives them; None to measure them all."""
     kept = kept or {}
@@ -661,7 +642,7 @@ def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, labels, kept=None):
         if tool not in cmor and d and os.path.isdir(d):
             by_version = {}
             total = 0
-            for m, v, b in case_files(d, labels):
+            for m, v, b in case_files(d, experiment, variant):
                 by_version.setdefault(v, set()).update(range(int(m.group(2)), int(m.group(3)) + 1))
                 total += b
             if years := sum(len(ys) for ys in by_version.values()):
@@ -684,44 +665,42 @@ def year_ranges(years):
     return ranges
 
 
-def case_files(directory, labels):
+def case_files(directory, experiment, variant):
     """A list of (name match, version, bytes), as cmor_files() gives them, one for each of the
-    case's CMOR files under the directory: those whose name has one of its labels as the
-    experiment, followed by its variant label, as in so_Omon_NorESM3_piControl_r1i1p1f1_gn_
-    000101-001012.nc.
+    case's CMOR files under the directory: those whose name has its experiment followed by
+    its variant, as in so_Omon_NorESM3_piControl_r1i1p1f1_gn_000101-001012.nc.
 
     directory: one tool's CMOR output directory, such as <case>.cmor/cmor or CMOR4CMIP7_DIR.
-    labels: the names of the case issue's labels, such as ["piControl", "r1i1p1f1"]. The one
-      that looks like r1i1p1f1 is the variant, and the rest may be the experiment. Without a
-      variant label, the case has no files."""
-    variant = next((l for l in labels if VARIANT.match(l)), None)
-    if not variant:
+    experiment: the case's experiment, from its run script's directory, such as piControl.
+    variant: the case's variant, from its issue's label, such as r1i1p1f1.
+    Without both, the case has no files."""
+    if not experiment or not variant:
         return []
-    keys = [f"_{l}_{variant}_" for l in labels if l != variant]
-    return [(m, v, b) for m, v, b in cmor_files(directory) if any(k in m.group(0) for k in keys)]
+    key = f"_{experiment}_{variant}_"
+    return [(m, v, b) for m, v, b in cmor_files(directory) if key in m.group(0)]
 
 
-def cmor_file_years(directory, labels):
+def cmor_file_years(directory, experiment, variant):
     """[[first, last], ...]: the years every variable of the case has a file for under the
     directory, from the time ranges in the CMOR file names. Files without a time range
     (fixed fields) don't count.
 
     directory: one tool's CMOR output directory, such as CMOR4CMIP7_DIR.
-    labels: the names of the case issue's labels, which pick its files, as in case_files()."""
+    experiment, variant: the case's, which pick its files, as in case_files()."""
     by_var = {}
-    for m, _, _ in case_files(directory, labels):
+    for m, _, _ in case_files(directory, experiment, variant):
         by_var.setdefault(m.group(1), set()).update(range(int(m.group(2)), int(m.group(3)) + 1))
     return year_ranges(set.intersection(*by_var.values())) if by_var else []
 
 
-def cmor_versions(directory, labels):
+def cmor_versions(directory, experiment, variant):
     """{version: [[first, last], ...]}: the years of the case's CMOR files under the
     directory, by the version directory they are in.
 
     directory: one tool's CMOR output directory, such as <case>.cmor/cmor or CMOR4CMIP7_DIR.
-    labels: the names of the case issue's labels, which pick its files, as in case_files()."""
+    experiment, variant: the case's, which pick its files, as in case_files()."""
     by_version = {}
-    for m, v, _ in case_files(directory, labels):
+    for m, v, _ in case_files(directory, experiment, variant):
         if v:
             by_version.setdefault(v, set()).update(range(int(m.group(2)), int(m.group(3)) + 1))
     return {v: year_ranges(ys) for v, ys in sorted(by_version.items())}
@@ -861,7 +840,8 @@ def main():
     # Each issue's case name is the one its run script gives create_newcase, so the issue's
     # title doesn't have to be the case name. The part of the name the script only knows
     # when it runs, such as $(date), comes from the case's directory on NIRD. An issue with
-    # no run script, or whose script names no case, falls back to its title.
+    # no run script, or whose script names no case, falls back to its title. The case's
+    # experiment is the directory its run script is in, scripts/<MIP>/<experiment>/.
     tracked = []
     for issue in sorted(issues, key=lambda i: i["number"]):
         num = issue["number"]
@@ -872,8 +852,14 @@ def main():
         script_paths = scripts_of_issue.get(num, [])
         text = None
         name = None
+        experiment = None
         notes = []
         if len(script_paths) == 1:
+            parts = script_paths[0].split("/")
+            if len(parts) != 3:
+                raise Failed(f"#{num}'s run script, scripts/{script_paths[0]}, is not in an experiment "
+                             "directory: run scripts go in scripts/<MIP>/<experiment>/.")
+            experiment = parts[1]
             text, why = read_run_script(REPO, script_paths[0], args.scripts)
             if text is None:
                 raise Failed(f"#{num}'s run script, scripts/{script_paths[0]}, could not be read: {why}")
@@ -887,15 +873,15 @@ def main():
                     name = pattern.replace(UNKNOWN, "*")
             else:
                 notes.append("its run script names no case; the title is used")
-        tracked.append((issue, num, title, labels, script_paths, text, name or title, notes))
+        tracked.append((issue, num, title, labels, script_paths, text, name or title, experiment, notes))
     # A case's parent is the issue whose case is its RUN_REFCASE.
-    issue_of_case = {name: num for _, num, _, _, _, _, name, _ in tracked}
+    issue_of_case = {name: num for _, num, _, _, _, _, name, _, _ in tracked}
 
     cases = []
     skipped = []
     # Each case's validation report, by case name, to be copied next to progress.json.
     reports = {}
-    for issue, num, title, labels, script_paths, text, name, notes in tracked:
+    for issue, num, title, labels, script_paths, text, name, experiment, notes in tracked:
         m = TITLE.match(name)
         if not m:
             skipped.append({"issue": num, "title": title, "reason": f"{name} is not a case name"})
@@ -904,9 +890,16 @@ def main():
         if name != title and "*" not in name:
             notes.append(f"its case is {name}")
         people = [u["login"] for u in issue.get("assignees") or []] or [issue["user"]["login"]]
+        # The issue's labels give only the variant, such as r1i1p1f1, and whether the case is
+        # completed or on ESGF.
+        variant = next((l for l in labels if VARIANT.match(l)), None)
         case = {"issue": num, "case": name, "resolution": RESOLUTION[m.group(1)],
                 "version": m.group(2), "owner": ", ".join(people), "labels": labels,
                 "completed": "completed" in labels}
+        if experiment:
+            case["experiment"] = experiment
+        if variant:
+            case["variant"] = variant
         found_dates = model_dates(HIST_DIR.format(case=name), HIST_PATTERN)
         if found_dates:
             last, missing = found_dates
@@ -914,30 +907,16 @@ def main():
             if missing:
                 # The years with no file, as [[first, last], ...], e.g. [[1854, 1855], [1857, 1857]].
                 case["missingYears"] = year_ranges(missing)
-        body = issue.get("body") or ""
-        # Each tool's output root is the issue's entry, or the default without one. Either may
-        # have {case}, {resolution}, {experiment} and {variant} in it, or <case> and so on,
-        # filled in from the issue;
-        # the experiment is whichever label names an existing directory. A default root counts
-        # only where it exists.
-        given = {tool: m.group(1) for tool, r in OUTPUT_ROOTS.items() if (m := r.search(body))}
-        variant = next((l for l in labels if VARIANT.match(l)), None)
+        # Each tool's output directory, where it exists. cmip7-prep's is the case's .cmor
+        # directory. cmor4cmip7's is the simulation's, from the case's resolution, experiment
+        # and variant.
         output = {}
-        for tool, default in (("cmip7prep", CMIP7PREP_DIR), ("cmor4cmip7", CMOR4CMIP7_DIR)):
-            root = given.get(tool) or default
-            if not root:
-                continue
-            root = re.sub(r"<(case|resolution|experiment|variant)>", r"{\1}", root)
-            if "{variant}" in root and not variant:
-                continue
-            root = (root.replace("{case}", name).replace("{resolution}", case["resolution"])
-                    .replace("{variant}", variant or ""))
-            places = ([root.replace("{experiment}", l) for l in labels if l != variant]
-                      if "{experiment}" in root else [root])
-            if d := next((d for d in places if os.path.isdir(d)), None):
-                output[tool] = d
-            elif tool in given and places:
-                output[tool] = places[0]
+        if os.path.isdir(d := CMIP7PREP_DIR.format(case=name)):
+            output["cmip7prep"] = d
+        if experiment and variant:
+            d = CMOR4CMIP7_DIR.format(resolution=case["resolution"], experiment=experiment, variant=variant)
+            if os.path.isdir(d):
+                output["cmor4cmip7"] = d
         if output:
             case["cmorOutput"] = output
         # Problems with the run script are printed with the case's line.
@@ -953,8 +932,6 @@ def main():
                         (n for c, n in issue_of_case.items() if "*" in c and name_pattern(c, "*").match(refcase)), None):
                     start["parent"] = parent
                 case["start"] = start
-        if m := DATA_VERSION.search(body):
-            case["dataVersion"] = "v" + m.group(1).lstrip("vV")
         if found := [i for i in cmor_issues if name in i["title"] + "\n" + (i.get("body") or "")]:
             case["cmorIssues"] = []
             for i in found:
@@ -969,7 +946,7 @@ def main():
                 case["cmor"] = sets
             # cmip7-prep writes its CMOR files under cmor/ in its output directory.
             prep_cmor = os.path.join(prep_dir, "cmor")
-            if v := cmor_versions(prep_cmor if os.path.isdir(prep_cmor) else prep_dir, labels):
+            if v := cmor_versions(prep_cmor if os.path.isdir(prep_cmor) else prep_dir, experiment, variant):
                 versions["cmip7prep"] = v
             # The validation report is copied next to progress.json once the page is built.
             report = os.path.join(prep_dir, VALIDATION_REPORT)
@@ -977,16 +954,16 @@ def main():
                 reports[name] = report
                 case["validationReport"] = f"{VALIDATION_COPIES}/{name}/index.html"
         if "cmor4cmip7" in output:
-            ranges = cmor_file_years(output["cmor4cmip7"], labels)
+            ranges = cmor_file_years(output["cmor4cmip7"], experiment, variant)
             if ranges:
                 case["cmor4cmip7"] = ranges
-            if v := cmor_versions(output["cmor4cmip7"], labels):
+            if v := cmor_versions(output["cmor4cmip7"], experiment, variant):
                 versions["cmor4cmip7"] = v
         if versions:
             case["cmorVersions"] = versions
         kept = earlier.get((num, name), {})
         storage = case_storage(CASE_DIR.format(case=name), name,
-                               prep_dir, output.get("cmor4cmip7"), labels, kept)
+                               prep_dir, output.get("cmor4cmip7"), experiment, variant, kept)
         if storage:
             case["storage"] = storage
         # Each case's timing files are in <case>/<case>/timing in its archive.

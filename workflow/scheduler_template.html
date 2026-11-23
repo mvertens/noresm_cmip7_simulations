@@ -589,7 +589,7 @@
         <pre class="wf-pre">cd /projects/NS9560K/www/diagnostics/noresm/noresm_cmip7_simulations
   git pull
   python3 -I workflow/nird_progress.py</pre>
-        <p class="editor-caption">The script finds each case's directory, <code>/nird/datalake/NS9560K/noresm3/cases/&lt;case&gt;</code>, from the case name its run script gives <code>create_newcase</code>, and writes <code>progress.json</code> next to this page. It then builds this page again from the copy of the spreadsheet in the repository. It is run with no arguments; the arguments are for testing and are described in the workflow README.</p>
+        <p class="editor-caption">The script finds each case's directory, <code>/nird/datalake/NS9560K/noresm3/cases/&lt;case&gt;</code>, from the case name its run script gives <code>create_newcase</code>, and writes <code>progress.json</code> next to this page. It then downloads the spreadsheet and builds this page again from it. It is run with no arguments; the arguments are for testing and are described in the workflow README.</p>
         <p class="editor-caption">The script uses information from the GitHub issues, the run scripts on GitHub that go with the issues, the case directories on NIRD and the CMORization directories:</p>
         <ul class="editor-caption wf-parts">
           <li>The <b>GitHub issues</b> determine each case's labels and assignee, and the CMORization issues in CMIP7_CMOR-Publish that name the case.</li>
@@ -629,13 +629,12 @@
               <p>Issues go in <a href="https://github.com/NorESMhub/noresm_cmip7_simulations/issues" target="_blank" rel="noopener">NorESMhub/noresm_cmip7_simulations</a>, one per case. The tracker is filled in from them, so:</p>
               <ul class="wf-parts">
                 <li><b>title:</b> the <a href="#wf-casename">case name</a>, with no spaces. The tracker takes the case name from the run script's <code>create_newcase --case</code>, so the title is only a label until the run script is on the branch;</li>
-                <li><b>experiment label:</b> the CMIP7 experiment, e.g. <code>esm-hist</code>, spelt as in the tracker;</li>
-                <li><b>variant label:</b> the ensemble member, e.g. <code>r1i1p1f1</code>;</li>
+                <li><b>variant label:</b> the ensemble member, e.g. <code>r1i1p1f1</code>. The case's experiment comes from the <a href="#wf-script">directory of its run script</a>, not from a label;</li>
                 <li><b>assignees:</b> whoever runs it, shown as the run's owner; with several, all of them are shown;</li>
                 <li><b><code class="wf-labelname">completed</code>:</b> add this label when the run has finished;</li>
                 <li><b><code class="wf-labelname">test</code>:</b> add this label to a case that is not a CMIP7 run, to leave it out;</li>
                 <li><b><code class="wf-labelname">esgf</code>:</b> add this label when the data is on ESGF;</li>
-                <li><b>continuing a simulation in a new case:</b> give the new issue the same experiment and variant labels. Its run script's <code>RUN_REFCASE</code> is the earlier case. The tracker reads the two as one simulation and takes its progress from the later model date, as with #2 and #11;</li>
+                <li><b>continuing a simulation in a new case:</b> give the new issue the same variant label, and put its run script in the same experiment directory. Its run script's <code>RUN_REFCASE</code> is the earlier case. The tracker reads the two as one simulation and takes its progress from the later model date, as with #2 and #11;</li>
                 <li><b>another member of the ensemble:</b> give it its own variant, e.g. <code>r2i1p1f1</code>. The run's years done are the mean over the members that have an issue.</li>
               </ul>
             </details>
@@ -643,10 +642,10 @@
               <summary>Archive the run script</summary>
               <p>Push the case's run script straight to its directory under <a href="https://github.com/NorESMhub/noresm_cmip7_simulations/tree/CMIP7_Runscripts/scripts" target="_blank" rel="noopener"><code>scripts/</code></a> on the <code>CMIP7_Runscripts</code> branch; this needs write access to the repository.</p>
               <ul class="wf-parts">
-                <li><b>directory:</b> <code>scripts/&lt;MIP&gt;/&lt;experiment&gt;/</code>. A case that is not a CMIP7 run, whose issue has the <code class="wf-labelname">test</code> label, goes in <code>scripts/test/</code>;</li>
+                <li><b>directory:</b> <code>scripts/&lt;MIP&gt;/&lt;experiment&gt;/</code>, e.g. <code>scripts/CMIP/piControl/</code>. The tracker takes the case's experiment from this directory, so it must be spelt as in the tracker; a run script anywhere else stops the progress script. A case that is not a CMIP7 run, whose issue has the <code class="wf-labelname">test</code> label, goes in <code>scripts/test/</code>;</li>
                 <li><b>name:</b> <code>issue.experiment.resolution.beta.variant.date.sh</code>. The progress script finds the case's script by the issue number it starts with, so no other script may start with it:
                   <ul>
-                    <li>the experiment and variant from the issue's labels, the rest from the case name, e.g. <code>011.piControl.LM.beta28.r1i1p1f1.20261102.sh</code> for <code>n1850GHGGaxg.LM.nor30b28.011.20261102</code>;</li>
+                    <li>the experiment from its directory, the variant from the issue's label, the rest from the case name, e.g. <code>011.piControl.LM.beta28.r1i1p1f1.20261102.sh</code> for <code>n1850GHGGaxg.LM.nor30b28.011.20261102</code>;</li>
                   </ul></li>
                 <li><b>push:</b> in a clone of the repository,
                   <ul>
@@ -704,7 +703,7 @@
           <li id="wf-cmorocn"><div class="wf-title">CMORize the ocean and ocean biogeochemistry using cmor4cmip7</div>
             <p>The CMORized output goes in <code>/nird/datapeak/NS9034K/.CMIP7</code>, under the model, experiment, variant and version, e.g. <code>NorESM3-LM/piControl/r1i1p1f1/v20261028</code>. The tracker's cmor4cmip7 column shows it as follows:</p>
             <ul class="wf-parts">
-              <li><b>where:</b> the progress script reads the simulation's variant directory, named from the issue's resolution, experiment and variant, e.g. <code>/nird/datapeak/NS9034K/.CMIP7/NorESM3-LM/piControl/r1i1p1f1</code>, and every version below it. It takes the files whose names have the issue's experiment and variant, e.g. <code>_piControl_r1i1p1f1_</code>;</li>
+              <li><b>where:</b> the progress script reads the simulation's variant directory, named from the case's resolution, experiment and variant, e.g. <code>/nird/datapeak/NS9034K/.CMIP7/NorESM3-LM/piControl/r1i1p1f1</code>, and every version below it. It takes the files whose names have the case's experiment and variant, e.g. <code>_piControl_r1i1p1f1_</code>;</li>
               <li><b>which issue:</b> the variant directory holds the whole simulation, so every issue with the same experiment and variant shares it. Each file goes to an issue by its years, from the time range in its name, e.g. <code>_185001-185912.nc</code>. An issue covers the years from its run script's <code>RUN_STARTDATE</code> to the year before the next issue's. A simulation with one issue gets all the files;</li>
               <li><b>years:</b> a year counts once every variable has a file for it. The chip shows the years that count, e.g. <code>#002 1–170</code>, or the years the files cover while no year counts. Clicking it shows the output directory and the version directories the files are in.</li>
             </ul></li>
@@ -1509,9 +1508,8 @@
   // A CMORize cell's panel opens under its years, one at a time, and closes on a click
   // elsewhere or Escape.
   // One case's chip in a CMORize cell, "#002 1–170", and the panel it opens: its years, its
-  // output directory, its issue's CMOR data version and the version directories its files
-  // are in, and for cmip7-prep a link to its validation report, which says what is missing
-  // or wrong.
+  // output directory, its CMORization issue and the version directories its files are in,
+  // and for cmip7-prep a link to its validation report, which says what is missing or wrong.
   // The link to a case's copy of its validation report, as progress.json gives it.
   const VALIDATION_LINK = /^validation\/[A-Za-z0-9._-]+\/index\.html$/;
   function cmorCaseBox(row, step, { member, c, info }, byVariant){
@@ -2259,12 +2257,11 @@
   // ---------------- progress from NIRD ----------------
   // workflow/nird_progress.py writes progress.json next to the page on NIRD: one entry per
   // case issue, with its labels, the latest model date in its files and the sets of years
-  // cmip7-prep has done. A case belongs to the run whose experiment is one of its labels, at
-  // its resolution, and to the member its variant label (r1i1p1f1) names: cases of one
-  // member are one simulation continued in new cases. A member's years done and CMORized
-  // count from its start: the earliest RUN_STARTDATE in its cases' run scripts, or the
-  // spreadsheet's start year while none of its run scripts can be read.
-  const VARIANT = /^r\d+i\d+p\d+f\d+$/;
+  // cmip7-prep has done. A case belongs to the run of its experiment, the directory its run
+  // script is in, at its resolution, and to the member its variant label (r1i1p1f1) names:
+  // cases of one member are one simulation continued in new cases. A member's years done and
+  // CMORized count from its start: the earliest RUN_STARTDATE in its cases' run scripts, or
+  // the spreadsheet's start year while none of its run scripts can be read.
   // A date YYYY-MM-DD as a model year with its fraction, e.g. 1850.5 for 1850-07-01.
   function fractionalYear(date){
     const [y, mo, d] = String(date).split("-").map(Number);
@@ -2495,9 +2492,9 @@
     const unmatched = (data.skipped || []).map(s => `#${s.issue}, ${s.reason}`);
     sims.forEach(r => { delete r.cases; delete r.owner; delete r.machine; });
     data.cases.forEach(c => {
-      const row = sims.find(r => r.resolution === c.resolution && (c.labels || []).includes(r.experiment));
-      c.variant = (c.labels || []).find(l => VARIANT.test(l));
-      if (!row) unmatched.push(`#${c.issue}, no label names an experiment in the plan at ${c.resolution}`);
+      const row = c.experiment && sims.find(r => r.resolution === c.resolution && r.experiment === c.experiment);
+      if (!c.experiment) unmatched.push(`#${c.issue}, no run script on GitHub, so its experiment is not known`);
+      else if (!row) unmatched.push(`#${c.issue}, its run script's experiment, ${c.experiment}, is not in the plan at ${c.resolution}`);
       else if (!c.variant) unmatched.push(`#${c.issue}, the issue needs a variant label, e.g. r1i1p1f1`);
       else { c.runName = row.name; (row.cases = row.cases || []).push(c); }
     });
