@@ -2168,10 +2168,28 @@
         }
         tdCases.appendChild(pair);
       });
-      // The name's hover gives a member's variant and the cases' names.
-      const nameHover = (row.memberOf ? [row.hasIssue ? `Member ${row.variant}` : `Member ${row.variant}: planned, no case issue yet`] : [])
-        .concat((row.cases || []).map(c => `${c.case} (${reached(c)})`));
-      if (nameHover.length) nameInput.title = nameHover.join("\n");
+      // Clicking the name opens a panel with a member's variant and its cases' names, which
+      // can be selected and copied from there.
+      const member = row.memberOf ? [row.hasIssue ? `Member ${row.variant}` : `Member ${row.variant}: planned, no case issue yet`] : [];
+      const caseLines = (row.cases || []).map(c => `#${c.issue} ${c.case} (${reached(c)})`);
+      if (member.length || caseLines.length){
+        const box = document.createElement("details"); box.className = "cmor-box name-box";
+        const summary = document.createElement("summary");
+        nameWrap.replaceChild(box, nameInput);
+        summary.appendChild(nameInput);
+        box.appendChild(summary);
+        const pop = document.createElement("div"); pop.className = "cmor-pop";
+        const h = document.createElement("h4"); h.textContent = row.name; pop.appendChild(h);
+        member.forEach(text => { const p = document.createElement("p"); p.textContent = text; pop.appendChild(p); });
+        if (caseLines.length){
+          const head = document.createElement("div"); head.className = "cp-head";
+          head.textContent = caseLines.length === 1 ? "Case" : "Cases"; pop.appendChild(head);
+          const ul = document.createElement("ul");
+          caseLines.forEach(text => { const li = document.createElement("li"); li.textContent = text; ul.appendChild(li); });
+          pop.appendChild(ul);
+        }
+        box.appendChild(pop);
+      }
       tr.appendChild(tdName); tr.appendChild(tdParent); tr.appendChild(tdOwner); tr.appendChild(tdCases); tr.appendChild(tdYears);
       stepCells.flat().forEach(td => tr.appendChild(td));
       simTbody.appendChild(tr);
