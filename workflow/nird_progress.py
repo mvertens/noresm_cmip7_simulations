@@ -14,6 +14,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import sys
 import urllib.error
 import urllib.parse
@@ -49,6 +50,11 @@ HIST_PATTERN = "*.cam.i.*.nc"
 # Each tool's output, for a case whose issue gives no output root.
 CMIP7PREP_DIR = CASE_DIR + ".cmor"
 CMOR4CMIP7_DIR = "/nird/datapeak/NS9034K/.CMIP7/NorESM3-{resolution}/{experiment}/{variant}"
+
+# cmip7-prep's validation report, below its output directory, and where the tracker keeps a
+# copy of each case's, below the directory of progress.json, so the page can link to it.
+VALIDATION_REPORT = "cmor/validation_reports"
+VALIDATION_COPIES = "validation"
 
 # The characters an issue's title may have.
 TITLE_CHARACTERS = re.compile(r"[A-Za-z0-9._-]+")
@@ -415,6 +421,51 @@ def cmor_sets(directory):
     return sorted(sets, key=lambda s: s["first"])
 
 
+def report_summary(report):
+    """A summary of cmip7-prep's validation report, one entry for each realm and frequency it
+    has a validation_summary.json for: how many variables were expected and produced, how
+    many are missing, and how many have errors, in their files or in cmip7-prep's logs."""
+    summary = []
+    for path in sorted(glob.glob(os.path.join(glob.escape(report), "*", "validation_summary.json"))):
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            scope = data.get("scope") or {}
+            counts = data.get("counts") or {}
+            summary.append({
+                "realm": str(scope.get("realm", "")),
+                "frequency": str(scope.get("frequency", "")),
+                "expected": int(counts.get("expected_variables", 0)),
+                "produced": int(counts.get("produced_variables", 0)),
+                "missing": int(counts.get("missing_variables", 0)),
+                "errors": int(counts.get("inspection_errors", 0)) + int(counts.get("variables_with_log_errors", 0)),
+            })
+        except (OSError, ValueError, TypeError, AttributeError):
+            continue
+    return summary
+
+
+def sync_report(source, dest):
+    """Makes dest a copy of the directory source: copies each file that dest lacks or has at
+    another size or modification time, and removes from dest what source no longer has."""
+    for root, dirs, files in os.walk(source):
+        target = os.path.normpath(os.path.join(dest, os.path.relpath(root, source)))
+        os.makedirs(target, exist_ok=True)
+        for name in files:
+            src = os.path.join(root, name)
+            dst = os.path.join(target, name)
+            s = os.stat(src)
+            if not os.path.isfile(dst) or os.path.getsize(dst) != s.st_size or int(os.path.getmtime(dst)) != int(s.st_mtime):
+                shutil.copy2(src, dst)
+    for root, dirs, files in os.walk(dest, topdown=False):
+        original = os.path.join(source, os.path.relpath(root, dest))
+        for name in files:
+            if not os.path.isfile(os.path.join(original, name)):
+                os.remove(os.path.join(root, name))
+        if not os.path.isdir(original):
+            os.rmdir(root)
+
+
 _cmor_files = {}
 
 
@@ -765,6 +816,8 @@ def main():
 
     cases = []
     skipped = []
+    # Each case's validation report, by case name, to be copied next to progress.json.
+    reports = {}
     for issue, num, title, labels, script_paths, text, name, notes in tracked:
         m = TITLE.match(name)
         if not m:
@@ -841,6 +894,13 @@ def main():
             prep_cmor = os.path.join(prep_dir, "cmor")
             if v := cmor_versions(prep_cmor if os.path.isdir(prep_cmor) else prep_dir, labels):
                 versions["cmip7prep"] = v
+            # The validation report is copied next to progress.json once the page is built.
+            report = os.path.join(prep_dir, VALIDATION_REPORT)
+            if os.path.isfile(os.path.join(report, "index.html")) and TITLE_CHARACTERS.fullmatch(name):
+                reports[name] = report
+                case["validationReport"] = f"{VALIDATION_COPIES}/{name}/index.html"
+                if summary := report_summary(report):
+                    case["validationSummary"] = summary
         if "cmor4cmip7" in output:
             ranges = cmor_file_years(output["cmor4cmip7"], labels)
             if ranges:
@@ -895,6 +955,18 @@ def main():
     if not sims:
         raise Failed("The page could not be built: the spreadsheet has no runs in the plan.")
 
+    # Each case's validation report is copied next to progress.json, where the web server
+    # serves it, and only what has changed since the last run is copied. A report that can't
+    # be copied is left without a link, with a warning, rather than stopping the update.
+    copies = os.path.join(os.path.dirname(os.path.abspath(a.out)), VALIDATION_COPIES)
+    for case in cases:
+        if case.get("case") not in reports:
+            continue
+        try:
+            sync_report(reports[case["case"]], os.path.join(copies, case["case"]))
+        except OSError as e:
+            del case["validationReport"]
+            print(f"warning: #{case['issue']}'s validation report could not be copied: {e}")
     # Both files are written to temporary files first and then moved into place, so the page
     # never reads a half-written file.
     written = []

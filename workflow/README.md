@@ -283,6 +283,21 @@ never run, in any set, is not noticed. The script also records which version
 directories, `vYYYYMMDD`, the CMORized files are in, along with the years in
 each version directory.
 
+cmip7-prep also writes a validation report, `cmor/validation_reports/index.html`
+in the case's `.cmor` directory. That directory is not served on the web, so
+the script copies each case's report next to `progress.json`, to
+`validation/<case>/`, and the page links to the copy. On each run it copies only
+the files that are new or have changed, by size and modification time, and
+removes from the copy what the report no longer has. A report that can't be
+copied, for example when the disk is full, leaves its case without a link and
+prints a warning; the rest of the tracker is still updated.
+
+The script also reads the report's `validation_summary.json` for each realm and
+frequency, and records a summary of it: how many variables were expected and
+produced, how many are missing, and how many have errors, in their files or in
+cmip7-prep's logs. The case's cmip7prep panel shows this summary as a table
+under the link to the report.
+
 #### cmor4cmip7 output
 
 The web page shows how many years of each simulation cmor4cmip7 has CMORized,
@@ -378,9 +393,14 @@ above the tables shows every run in the plan.
   start.
 - A case that continues an earlier case of the same member is shown underneath
   that case in the Issues column.
-- The cmip7prep chip is dashed until at least one of the case's sets of years
-  counts. The cmor4cmip7 chip is red when there is a problem in the case's
-  years.
+- A cmip7prep chip shows the years cmip7-prep has fully CMORized for the case,
+  e.g. `#002 1–50`. If no years are finished yet, it shows the years cmip7-prep
+  has started on. Clicking the chip opens a panel with the case's output
+  directory, the steps that have not finished, if any, a link to the case's
+  validation report, and a summary of the report for each realm and frequency.
+- A cmor4cmip7 chip is red when the script found a problem with the case's
+  files: years that some variables have and others lack, or a year that is in
+  more than one file. Clicking it lists the problems.
 - Each run is costed from measured timings once there are any, separately for
   Olivia and Betzy. A run whose cases have timing files uses its own measured
   cost and throughput. Any other run uses the mean over all the cases of its

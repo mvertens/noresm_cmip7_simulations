@@ -522,7 +522,6 @@
   #simTables .th-note{ font-size: 10px; font-weight: 500; color: var(--series-1); white-space: nowrap; }
   #simTables td.step-c .step-range{ display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 11px; white-space: nowrap; padding: 1px 6px; border-radius: 8px; color: var(--text-primary); background: color-mix(in srgb, var(--series-7) 18%, transparent); }
   #simTables td.step-c .step-range.done{ font-weight: 700; }
-  #simTables td.step-c .step-range.partial{ background: transparent; border: 1px dashed currentColor; padding: 0 5px; }
   /* Several cases' cmip7prep chips wrap, one under the other. */
   #simTables td.step-c .step-ranges{ display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
   /* A CMORize cell's years open a panel with where the output is and its version directories;
@@ -544,6 +543,12 @@
   .cmor-pop .bad{ color: var(--danger); }
   .cmor-pop code{ font-family: "JetBrains Mono", monospace; font-size: 11px; }
   .cmor-pop p{ margin: 4px 0 0; }
+  /* The validation report's summary, a small table of its own inside the panel, not styled
+     like the tracker's tables around it. */
+  #simTables .cmor-pop table.cp-table{ width: auto; min-width: 0; table-layout: auto; border-collapse: collapse; margin: 4px 0 0; font-size: 11.5px; background: none; }
+  #simTables .cmor-pop table.cp-table th, #simTables .cmor-pop table.cp-table td{ width: auto; height: auto; padding: 1px 14px 1px 0; border: none; background: none; text-align: left; white-space: nowrap; overflow: visible; font-family: inherit; font-size: inherit; }
+  #simTables .cmor-pop table.cp-table th{ color: var(--text-muted); font-weight: 600; }
+  #simTables .cmor-pop table.cp-table td:nth-child(n+3), #simTables .cmor-pop table.cp-table th:nth-child(n+3){ text-align: right; font-variant-numeric: tabular-nums; }
   /* A finished CMORize cell shows its years in green; a finished label step shows a green ✓. */
   #simTables td.step-c.auto-done details.cmor-box:not(.bad) .step-range{ background: color-mix(in srgb, var(--series-6) 18%, transparent); }
   #simTables thead th[rowspan]:not(:first-child):not(.col-narrow),
@@ -703,7 +708,8 @@
               <li><b>where:</b> the progress script reads the case's own <code>.cmor</code> directory, not the ones below it;</li>
               <li><b>which issue:</b> each case has its own <code>.cmor</code> directory, named after its issue's title, so everything in it belongs to that issue. piControl's #2 can be done while #11 is not;</li>
               <li><b>years:</b> cmip7-prep writes a <code>completed_steps_&lt;first&gt;-&lt;last&gt;.json</code> file for each set of years it has CMORized. A set counts once it has finished every <code>cmor-</code> step that any of the simulation's sets has run, so a set where one realm failed doesn't count, even if that realm failed in every set. The chip shows the years of the sets that count, e.g. <code>#002 1–50</code>;</li>
-              <li><b>dashed chip:</b> no set counts yet; the chip shows the years of all the sets.</li>
+              <li><b>no set counts yet:</b> the chip shows the years of all the sets, and clicking it lists the steps that have not finished;</li>
+              <li><b>validation report:</b> clicking the chip links to the case's validation report, which cmip7-prep writes to <code>cmor/validation_reports/</code> and the progress script copies next to the tracker.</li>
             </ul></li>
           <li id="wf-cmorocn"><div class="wf-title">CMORize the ocean and ocean biogeochemistry using cmor4cmip7</div>
             <p>The CMORized output goes in <code>/nird/datapeak/NS9034K/.CMIP7</code>, under the model, experiment, variant and version, e.g. <code>NorESM3-LM/piControl/r1i1p1f1/v20261028</code>. The tracker's cmor4cmip7 column shows it as follows:</p>
@@ -1496,20 +1502,19 @@
   // elsewhere or Escape.
   // One case's chip in a CMORize cell, "#002 1–170", and the panel it opens: what is wrong
   // with its files, if anything, its years, its output directory, its issue's CMOR data
-  // version and the version directories its files are in. A chip is red when no year has
-  // every realm because a cmip7-prep step failed or is still running, or when the script
-  // found something wrong with cmor4cmip7's files. A cmip7-prep chip is dashed while no year
-  // has every realm for another reason.
+  // version and the version directories its files are in, and for cmip7-prep its steps not
+  // finished and its validation report. A cmor4cmip7 chip is red when the script found
+  // something wrong with its files.
+  // The link to a case's copy of its validation report, as progress.json gives it.
+  const VALIDATION_LINK = /^validation\/[A-Za-z0-9._-]+\/index\.html$/;
   function cmorCaseBox(row, step, { member, c, info }, byVariant){
     const tool = step.key === "cmoratm" ? "cmip7prep" : "cmor4cmip7";
     const problems = info.problems || [];
-    const unfinished = tool === "cmip7prep" && !info.years.length;
-    const failed = unfinished && (info.unfinished || []).some(s => s.failed.length);
     const box = document.createElement("details");
-    box.className = "cmor-box" + (problems.length || failed ? " bad" : "");
+    box.className = "cmor-box" + (problems.length ? " bad" : "");
     const summary = document.createElement("summary");
     const chip = document.createElement("span");
-    chip.className = "step-range" + (unfinished && !failed ? " partial" : "");
+    chip.className = "step-range";
     chip.textContent = `#${String(c.issue).padStart(3, "0")} ${yearSpans(info.years.length ? info.years : info.files)}`;
     summary.appendChild(chip);
     box.appendChild(summary);
@@ -1547,6 +1552,33 @@
         : `No year has every ${what} yet; the files cover ${yearSpans(info.files)}.`,
     ]);
     list("Output directory", [c.output[tool] || "None found yet."]);
+    // cmip7-prep's validation report, which nird_progress.py copies next to the page.
+    if (tool === "cmip7prep"){
+      add("div", "cp-head", "Validation report");
+      const ul = add("ul"), li = document.createElement("li");
+      if (VALIDATION_LINK.test(c.validationReport || "")){
+        li.appendChild(Object.assign(document.createElement("a"),
+          { href: c.validationReport, target: "_blank", rel: "noopener", textContent: "Open the validation report" }));
+      } else {
+        li.textContent = "None yet: cmip7-prep writes it to cmor/validation_reports/ in the output directory.";
+      }
+      ul.appendChild(li);
+      // Its summary: for each realm and frequency, the variables produced of those expected,
+      // the ones missing, and the ones with errors in their files or cmip7-prep's logs.
+      if (c.validationSummary.length){
+        const table = add("table", "cp-table");
+        const head = table.insertRow();
+        ["Realm", "Frequency", "Produced", "Missing", "Errors"].forEach(t => {
+          const th = document.createElement("th"); th.textContent = t; head.appendChild(th);
+        });
+        c.validationSummary.forEach(v => {
+          const tr = table.insertRow();
+          [v.realm, v.frequency, `${v.produced} of ${v.expected}`, v.missing, v.errors].forEach(t => {
+            tr.insertCell().textContent = t;
+          });
+        });
+      }
+    }
     // cmip7-prep's steps not finished, set by set, without the "cmor-" every step starts with.
     if (info.unfinished && info.unfinished.length){
       const steps = keys => keys.map(k => k.replace(/^cmor-/, "")).join(", ");
@@ -2354,6 +2386,8 @@
       return {
         issue: c.issue, from, to, shownTo, output: c.cmorOutput || {},
         cmorIssues: c.cmorIssues || [],
+        validationReport: c.validationReport || null,
+        validationSummary: Array.isArray(c.validationSummary) ? c.validationSummary : [],
         cmoratm: {
           years: sorted(prepComplete),
           files: sorted(prepAny.concat(Object.values(prepVersions).flat())),
