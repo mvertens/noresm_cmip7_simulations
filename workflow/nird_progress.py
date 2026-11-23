@@ -457,8 +457,8 @@ def file_version(dirpath):
 
 
 def cmor_files(directory):
-    """(name match, version, bytes) of each CMOR file with a time range under the directory,
-    read once per run."""
+    """A list of (name match, version, bytes), one for each CMOR file with a time range under
+    the directory, read once per run."""
     if directory not in _cmor_files:
         _cmor_files[directory] = [(m, file_version(d), size(os.path.join(d, name)))
                                   for d, _, names in os.walk(directory)
@@ -597,9 +597,9 @@ def year_ranges(years):
 
 
 def case_files(directory, labels):
-    """(name match, version) of the case's CMOR files under the directory: those whose name
-    has one of its labels as the experiment, followed by its variant label, as in
-    so_Omon_NorESM3_piControl_r1i1p1f1_gn_000101-001012.nc."""
+    """A list of (name match, version, bytes), one for each of the case's CMOR files under
+    the directory: those whose name has one of its labels as the experiment, followed by its
+    variant label, as in so_Omon_NorESM3_piControl_r1i1p1f1_gn_000101-001012.nc."""
     variant = next((l for l in labels if VARIANT.match(l)), None)
     if not variant:
         return []
