@@ -16,6 +16,7 @@ import re
 import shlex
 import shutil
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -444,22 +445,84 @@ def cmor_sets(directory):
     return sorted(sets, key=lambda s: s["first"])
 
 
-def sync_report(source, dest):
+# What the tracker writes next to progress.json gets the group of that directory, and is
+# writable by the group and readable by everyone, as the web server needs. So anyone in the
+# group can run the script after someone else has. A directory is setgid, so that what is
+# made in it gets its group too.
+SHARED_FILE = 0o664
+SHARED_DIR = 0o2775
+
+
+def share(path, gid, mode):
+    """Gives a file or directory this run has made the group and the mode, so that another
+    member of the group can replace it on a later run.
+
+    path: the file or directory.
+    gid: the group of the directory progress.json is in.
+    mode: SHARED_FILE for a file, SHARED_DIR for a directory."""
+    # The group is set first, since changing it can clear the setgid bit.
+    os.chown(path, -1, gid)
+    os.chmod(path, mode)
+
+
+def shared_temp(path, gid):
+    """The path of a new, empty file next to path, named after it and this run, such as
+    .progress.json.k3j9x2.tmp, shared as share() does. Each run's name is its own, so a file
+    left by a run that was stopped can't get in the way of the next.
+
+    path: the file the temporary file is to replace once it is written.
+    gid: the group of the directory progress.json is in."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)),
+                               prefix=f".{os.path.basename(path)}.", suffix=".tmp")
+    os.close(fd)
+    try:
+        share(tmp, gid, SHARED_FILE)
+    except OSError:
+        os.remove(tmp)
+        raise
+    return tmp
+
+
+def make_shared_dir(path, gid):
+    """Makes the directory, and any of its parents that don't exist, shared as share() does.
+
+    path: the directory, such as validation/<case> next to progress.json.
+    gid: the group of the directory progress.json is in."""
+    if os.path.isdir(path):
+        return
+    make_shared_dir(os.path.dirname(path), gid)
+    os.mkdir(path)
+    share(path, gid, SHARED_DIR)
+
+
+def sync_report(source, dest, gid):
     """Makes dest a copy of the directory source: copies each file that dest lacks or has at
     another size or modification time, and removes from dest what source no longer has.
+    What it makes is shared as share() does, and each file is copied to a temporary file
+    and then moved into place, so that it can replace a file another user copied.
 
     source: a case's validation report directory, <cmip7-prep output>/cmor/validation_reports.
     dest: where its copy goes, validation/<case> next to progress.json. It is created if it
-      doesn't exist."""
+      doesn't exist.
+    gid: the group of the directory progress.json is in."""
     for root, dirs, files in os.walk(source):
         target = os.path.normpath(os.path.join(dest, os.path.relpath(root, source)))
-        os.makedirs(target, exist_ok=True)
+        make_shared_dir(target, gid)
         for name in files:
             src = os.path.join(root, name)
             dst = os.path.join(target, name)
             s = os.stat(src)
             if not os.path.isfile(dst) or os.path.getsize(dst) != s.st_size or int(os.path.getmtime(dst)) != int(s.st_mtime):
-                shutil.copy2(src, dst)
+                tmp = shared_temp(dst, gid)
+                try:
+                    shutil.copyfile(src, tmp)
+                    # The copy keeps the original's time, by which the next run tells
+                    # whether it has changed.
+                    os.utime(tmp, (s.st_atime, s.st_mtime))
+                    os.replace(tmp, dst)
+                except OSError:
+                    os.remove(tmp)
+                    raise
     for root, dirs, files in os.walk(dest, topdown=False):
         original = os.path.join(source, os.path.relpath(root, dest))
         for name in files:
@@ -980,30 +1043,36 @@ def main():
     # Each case's validation report is copied next to progress.json, where the web server
     # serves it, and only what has changed since the last run is copied. A report that can't
     # be copied is left without a link, with a warning, rather than stopping the update.
-    copies = os.path.join(os.path.dirname(os.path.abspath(args.out)), VALIDATION_COPIES)
+    # What is written next to progress.json gets the group of its directory, as share() says.
+    directory = os.path.dirname(os.path.abspath(args.out))
+    try:
+        gid = os.stat(directory).st_gid
+    except OSError as e:
+        raise Failed(f"{directory} can't be written to: {e}") from e
+    copies = os.path.join(directory, VALIDATION_COPIES)
     for case in cases:
         if case.get("case") not in reports:
             continue
         try:
-            sync_report(reports[case["case"]], os.path.join(copies, case["case"]))
+            sync_report(reports[case["case"]], os.path.join(copies, case["case"]), gid)
         except OSError as e:
             del case["validationReport"]
             print(f"warning: #{case['issue']}'s validation report could not be copied: {e}")
     # Both files are written to temporary files first and then moved into place, so the page
     # never reads a half-written file.
-    written = []
+    temps = {}
     try:
         for path, content in ((args.out, json.dumps(data, indent=1)), (page, text)):
-            with open(path + ".tmp", "w", encoding="utf-8") as f:
+            temps[path] = shared_temp(path, gid)
+            with open(temps[path], "w", encoding="utf-8") as f:
                 f.write(content)
-            written.append(path)
     except OSError as e:
-        for done in (args.out, page):
-            if os.path.exists(done + ".tmp"):
-                os.remove(done + ".tmp")
+        for tmp in temps.values():
+            if os.path.exists(tmp):
+                os.remove(tmp)
         raise Failed(f"{path} could not be written: {e}") from e
-    for path in written:
-        os.replace(path + ".tmp", path)
+    for path, tmp in temps.items():
+        os.replace(tmp, path)
     for w in warnings:
         print("warning:", w)
     print(f"{args.out}: {len(cases)} cases")

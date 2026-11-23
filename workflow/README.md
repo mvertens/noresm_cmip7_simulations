@@ -165,7 +165,12 @@ happens:
 
 It builds the page before writing anything, writes both files to temporary
 files, and then moves them into place, so that the web page never reads a
-half-written file. For each
+half-written file. Each run's temporary files have names of their own, so a
+file left by a run that was stopped can't get in the way. Everything the
+script writes in the page's directory, including the copies of the validation
+reports, gets that directory's group and is writable by the group, whatever
+the umask of whoever runs it. So anyone in the group can run the script after
+someone else has. For each
 issue, the script also prints one line with the issue's labels, the case's
 latest model date and its start date. A case with no output yet is marked
 "no output on NIRD".
