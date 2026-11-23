@@ -539,7 +539,6 @@
   .cmor-pop .cp-head{ margin: 8px 0 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
   .cmor-pop ul{ margin: 0; padding-left: 16px; }
   .cmor-pop li{ margin: 1px 0; overflow-wrap: anywhere; }
-  .cmor-pop .bad{ color: var(--danger); }
   .cmor-pop code{ font-family: "JetBrains Mono", monospace; font-size: 11px; }
   .cmor-pop p{ margin: 4px 0 0; }
   #simTables thead th[rowspan]:not(:first-child):not(.col-narrow),
@@ -707,8 +706,7 @@
             <ul class="wf-parts">
               <li><b>where:</b> the progress script reads the simulation's variant directory, named from the issue's resolution, experiment and variant, e.g. <code>/nird/datapeak/NS9034K/.CMIP7/NorESM3-LM/piControl/r1i1p1f1</code>, and every version below it. It takes the files whose names have the issue's experiment and variant, e.g. <code>_piControl_r1i1p1f1_</code>;</li>
               <li><b>which issue:</b> the variant directory holds the whole simulation, so every issue with the same experiment and variant shares it. Each file goes to an issue by its years, from the time range in its name, e.g. <code>_185001-185912.nc</code>. An issue covers the years from its run script's <code>RUN_STARTDATE</code> to the year before the next issue's. A simulation with one issue gets all the files;</li>
-              <li><b>years:</b> a year counts once every variable has a file for it. The chip shows the years that count, e.g. <code>#002 1–170</code>, or the years the files cover while no year counts;</li>
-              <li><b>problems:</b> the chip's panel says when something is wrong with the files for the issue's years. Either some variables have no files for years other variables have, or a variable has a year in more than one file of the same version. The chip's panel lists the years and variables.</li>
+              <li><b>years:</b> a year counts once every variable has a file for it. The chip shows the years that count, e.g. <code>#002 1–170</code>, or the years the files cover while no year counts. Clicking it shows the output directory and the version directories the files are in.</li>
             </ul></li>
         </ul>
         <p class="wf-note">cmip7-prep and cmor4cmip7 lay out their output differently. That doesn't matter for publication: esg-prep links both into the structure ESGF needs. The CMORization and publication workflow, and the esg-prep command, will be added here as they are settled.</p>
@@ -1510,18 +1508,16 @@
 
   // A CMORize cell's panel opens under its years, one at a time, and closes on a click
   // elsewhere or Escape.
-  // One case's chip in a CMORize cell, "#002 1–170", and the panel it opens: what is wrong
-  // with its files, if anything, its years, its output directory, its issue's CMOR data
-  // version and the version directories its files are in, and for cmip7-prep a link to its
-  // validation report, which says what is missing or wrong. Every chip is the same colour,
-  // whatever the script found.
+  // One case's chip in a CMORize cell, "#002 1–170", and the panel it opens: its years, its
+  // output directory, its issue's CMOR data version and the version directories its files
+  // are in, and for cmip7-prep a link to its validation report, which says what is missing
+  // or wrong.
   // The link to a case's copy of its validation report, as progress.json gives it.
   const VALIDATION_LINK = /^validation\/[A-Za-z0-9._-]+\/index\.html$/;
   function cmorCaseBox(row, step, { member, c, info }, byVariant){
     const tool = step.key === "cmoratm" ? "cmip7prep" : "cmor4cmip7";
-    const problems = info.problems || [];
     const box = document.createElement("details");
-    box.className = "cmor-box" + (problems.length ? " bad" : "");
+    box.className = "cmor-box";
     const summary = document.createElement("summary");
     const chip = document.createElement("span");
     chip.className = "step-range";
@@ -1549,11 +1545,6 @@
     };
     const versions = Object.entries(info.versions);
     add("h4", null, `#${c.issue}, ${row.name}${byVariant ? " " + member.variant : ""}: ${tool}`);
-    if (problems.length){
-      add("div", "cp-head bad", "Problems");
-      const ul = add("ul", "bad");
-      problems.forEach(p => { const li = document.createElement("li"); li.textContent = p; ul.appendChild(li); });
-    }
     const caseYears = c.shownTo === Infinity ? `from ${c.from}` : `${c.from}–${c.shownTo}`;
     list("Years", [
       `The case runs years ${caseYears}${c.to === Infinity ? " so far" : ""}.`,
@@ -2375,16 +2366,6 @@
       const prepVersions = versionYears((c.cmorVersions || {}).cmip7prep, () => true);
       const ocnVersions = versionYears(Object.fromEntries(Object.entries(m.versions.cmor4cmip7)
         .map(([v, ys]) => [v, ys.map(y => [y, y])])), inCase);
-      // What the script found wrong with cmor4cmip7's files, for this case's years.
-      const found = c.cmor4cmip7Problems || {};
-      const caseYears = g => g.years.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, k) => a + k)).filter(inCase);
-      const names = vs => `${vs.length} variable${vs.length > 1 ? "s" : ""}: ${vs.join(", ")}`;
-      const ocnProblems = [
-        ...(found.missing || []).map(g => [g, caseYears(g)]).filter(([, ys]) => ys.length)
-          .map(([g, ys]) => `No files for ${yearSpans(ys)}, which other variables have, for ${names(g.variables)}.`),
-        ...(found.overlaps || []).map(g => [g, caseYears(g)]).filter(([, ys]) => ys.length)
-          .map(([g, ys]) => `${ys.length > 1 ? "Years" : "Year"} ${yearSpans(ys)} ${ys.length > 1 ? "are" : "is"} in more than one file${g.version ? " in " + g.version : ""}, for ${names(g.variables)}.`),
-      ];
       return {
         issue: c.issue, from, to, shownTo, output: c.cmorOutput || {},
         cmorIssues: c.cmorIssues || [],
@@ -2398,7 +2379,6 @@
           years: sorted([...ocn].filter(inCase)),
           files: sorted(Object.values(ocnVersions).flat()),
           versions: ocnVersions,
-          problems: ocnProblems,
         },
       };
     });

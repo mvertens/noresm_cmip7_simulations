@@ -153,7 +153,7 @@ happens:
 - GitHub's reply is not a list of issues, each with a number, a title, labels
   and a user, such as when GitHub sends an error message instead.
 - No case issues are read at all.
-- A run script can't be read.
+- No run scripts are found, or a run script can't be read.
 - The spreadsheet can't be downloaded, or has no runs in the plan.
 - The page can't be built.
 
@@ -295,21 +295,15 @@ prints a warning; the rest of the tracker is still updated.
 #### cmor4cmip7 output
 
 The web page shows how many years of each simulation cmor4cmip7 has CMORized,
-and whether anything is wrong with the files. The script reads the variable and
-the years of each file from the file's name, e.g.
-`tos_tavg-u-hxy-sea_…_185001-185912.nc`.
-
-A year counts as CMORized once every variable has a file for it. Two kinds of
-problems are recorded.
-
-- A variable has missing years if other variables have files for years that it
-  has no file for.
-- A variable has overlaps if two of its files in the same version directory
-  cover the same time.
+and the directories its files are in. The script reads the variable and the
+years of each file from the file's name, e.g.
+`tos_tavg-u-hxy-sea_…_185001-185912.nc`, and a year counts as CMORized once
+every variable has a file for it. It does not check the files themselves:
+checking cmor4cmip7's output is left to cmor4cmip7.
 
 All the cases of a continued simulation share one cmor4cmip7 directory. The web
 page therefore gives each case only the years from its own `RUN_STARTDATE` up to
-the next case's `RUN_STARTDATE`, along with the problems in those years.
+the next case's `RUN_STARTDATE`.
 
 #### Output size
 
@@ -402,9 +396,8 @@ above the tables shows every run in the plan.
   has started on. Clicking the chip opens a panel with the case's output
   directory and a link to the case's validation report, which says what is
   missing or wrong.
-- Clicking a cmor4cmip7 chip lists the problems the script found with the
-  case's files: years that some variables have and others lack, or a year that
-  is in more than one file. The chip's colour does not change.
+- Clicking a cmor4cmip7 chip opens a panel with the case's output directory
+  and the version directories its files are in.
 - Each run is costed from measured timings once there are any, separately for
   Olivia and Betzy. A run whose cases have timing files uses its own measured
   cost and throughput. Any other run uses the mean over all the cases of its

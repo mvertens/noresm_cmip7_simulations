@@ -74,9 +74,6 @@ COMPLETED = re.compile(r"completed_steps_(\d+)-(\d+)\.json$")
 # so_Omon_NorESM3_piControl_r1i1p1f1_gn_000101-001012.nc
 CMOR_FILE = re.compile(r"^(.+)_(\d{4})\d*-(\d{4})\d*\.nc$")
 
-# The full start and end dates of a CMOR file's time range, e.g. 185001 and 185912.
-CMOR_TIME = re.compile(r"_(\d{4,14})-(\d{4,14})\.nc$")
-
 # A kind of output measured over at least this many years is not measured again.
 STORAGE_YEARS = 5
 
@@ -617,50 +614,6 @@ def cmor_file_years(directory, labels):
     return year_ranges(set.intersection(*by_var.values())) if by_var else []
 
 
-def variable_name(prefix):
-    """A CMOR file's variable as its first two name fields, e.g. tos_tavg-u-hxy-sea or so_Omon."""
-    return "_".join(prefix.split("_")[:2])
-
-
-def cmor_problems(directory, labels):
-    """What is wrong with the case's CMOR files under the directory, each kind grouped by the
-    years it affects: missing, the variables with no file for years other variables have;
-    overlaps, the variables with a year in more than one file of the same version, by
-    version. None if nothing is wrong."""
-    by_var = {}
-    files = {}
-    for m, v, _ in case_files(directory, labels):
-        by_var.setdefault(m.group(1), set()).update(range(int(m.group(2)), int(m.group(3)) + 1))
-        t = CMOR_TIME.search(m.group(0))
-        start = t.group(1).ljust(14, "0")
-        end = t.group(2).ljust(14, "9")
-        files.setdefault((m.group(1), v), []).append((start, end))
-    every = set().union(*by_var.values()) if by_var else set()
-    missing = {}
-    for var, years in by_var.items():
-        if gap := every - years:
-            missing.setdefault(tuple(map(tuple, year_ranges(gap))), set()).add(variable_name(var))
-    overlaps = {}
-    for (var, v), spans in files.items():
-        spans.sort()
-        years = set()
-        end = None
-        for s, e in spans:
-            if end is not None and s <= end:
-                years.update(range(int(s[:4]), int(min(e, end)[:4]) + 1))
-            end = e if end is None else max(end, e)
-        if years:
-            overlaps.setdefault((v, tuple(map(tuple, year_ranges(years)))), set()).add(variable_name(var))
-    problems = {}
-    if missing:
-        problems["missing"] = [{"years": [list(r) for r in ys], "variables": sorted(vs)}
-                               for ys, vs in sorted(missing.items())]
-    if overlaps:
-        problems["overlaps"] = [{"version": v, "years": [list(r) for r in ys], "variables": sorted(vs)}
-                                for (v, ys), vs in sorted(overlaps.items(), key=lambda kv: (kv[0][0] or "", kv[0][1]))]
-    return problems or None
-
-
 def cmor_versions(directory, labels):
     """{version: [[first, last], ...]}: the years of the case's CMOR files under the
     directory, by the version directory they are in."""
@@ -728,35 +681,35 @@ def case_timing(directory):
 def main():
     # On NIRD the script is run with no arguments. They are for testing a change without
     # touching the published page, and for measuring the storage again.
-    p = argparse.ArgumentParser()
-    p.add_argument("out", nargs="?", default=PROGRESS,
-                   help=f"where to write progress.json; the page, index.html, goes next to it (default {PROGRESS})")
-    p.add_argument("--sheet", help="read the experiments from this CSV file, the spreadsheet's "
-                                   "DECK_FASTTRACK tab, instead of from the spreadsheet")
-    p.add_argument("--issues", help="read the case issues from this JSON file instead of GitHub")
-    p.add_argument("--scripts", help="read the run scripts from this scripts/ directory, e.g. in a "
-                                     "checkout of the CMIP7_Runscripts branch, instead of GitHub")
-    p.add_argument("--remeasure-storage", action="store_true",
-                   help="measure every case's storage on NIRD again, instead of keeping what the "
-                        "last progress.json has for it; the cost and throughput are read again "
-                        "on every run regardless")
-    a = p.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("out", nargs="?", default=PROGRESS,
+                        help=f"where to write progress.json; the page, index.html, goes next to it (default {PROGRESS})")
+    parser.add_argument("--sheet", help="read the experiments from this CSV file, the spreadsheet's "
+                                        "DECK_FASTTRACK tab, instead of from the spreadsheet")
+    parser.add_argument("--issues", help="read the case issues from this JSON file instead of GitHub")
+    parser.add_argument("--scripts", help="read the run scripts from this scripts/ directory, e.g. in a "
+                                          "checkout of the CMIP7_Runscripts branch, instead of GitHub")
+    parser.add_argument("--remeasure-storage", action="store_true",
+                        help="measure every case's storage on NIRD again, instead of keeping what the "
+                             "last progress.json has for it; the cost and throughput are read again "
+                             "on every run regardless")
+    args = parser.parse_args()
 
     # Each case's output as the last run measured it, kept where it covers enough years.
     earlier = {}
-    if not a.remeasure_storage:
+    if not args.remeasure_storage:
         try:
-            with open(a.out, encoding="utf-8") as f:
+            with open(args.out, encoding="utf-8") as f:
                 # By issue and case, so a case whose name has changed is measured again.
                 earlier = {(c["issue"], c.get("case")): settled_storage(c.get("storage"))
                            for c in json.load(f)["cases"]}
         except (OSError, ValueError, KeyError, TypeError):
             pass
 
-    if a.issues:
-        with open(a.issues, encoding="utf-8") as f:
+    if args.issues:
+        with open(args.issues, encoding="utf-8") as f:
             issues = json.load(f)
-        check_issues(issues, a.issues)
+        check_issues(issues, args.issues)
         issues = [i for i in issues if "pull_request" not in i]
     else:
         try:
@@ -766,7 +719,7 @@ def main():
     # The repository always has case issues, so none means GitHub's reply was wrong, and a
     # page without them would show no progress at all.
     if not issues:
-        raise Failed(f"No issues were read from {a.issues or REPO}.")
+        raise Failed(f"No issues were read from {args.issues or REPO}.")
     # Only an issue whose title is a name, of letters, digits, ".", "-" and "_", is a case.
     # Any other title, such as one with a space, is a note or a placeholder for a run not
     # set up yet, and the issue is left out.
@@ -784,11 +737,13 @@ def main():
     except (OSError, ValueError, http.client.HTTPException) as e:
         raise Failed(f"The CMORization issues in {CMOR_REPO} could not be read: {e}") from e
     # A case's run script is the one whose name starts with its issue number.
-    scripts, why = list_run_scripts(REPO, a.scripts)
+    scripts, why = list_run_scripts(REPO, args.scripts)
     if scripts is None:
         raise Failed(f"The run scripts could not be listed: {why}")
+    if not scripts:
+        raise Failed(f"No run scripts were found in {args.scripts or REPO + ' ' + RUNSCRIPTS_BRANCH}.")
     scripts_of_issue = {}
-    for path in sorted(scripts or []):
+    for path in sorted(scripts):
         if m := SCRIPT_ISSUE.match(os.path.basename(path)):
             scripts_of_issue.setdefault(int(m.group(1)), []).append(path)
 
@@ -808,7 +763,7 @@ def main():
         name = None
         notes = []
         if len(script_paths) == 1:
-            text, why = read_run_script(REPO, script_paths[0], a.scripts)
+            text, why = read_run_script(REPO, script_paths[0], args.scripts)
             if text is None:
                 raise Failed(f"#{num}'s run script, scripts/{script_paths[0]}, could not be read: {why}")
             if pattern := script_case_name(text):
@@ -914,8 +869,6 @@ def main():
             ranges = cmor_file_years(output["cmor4cmip7"], labels)
             if ranges:
                 case["cmor4cmip7"] = ranges
-            if found_problems := cmor_problems(output["cmor4cmip7"], labels):
-                case["cmor4cmip7Problems"] = found_problems
             if v := cmor_versions(output["cmor4cmip7"], labels):
                 versions["cmor4cmip7"] = v
         if versions:
@@ -949,13 +902,13 @@ def main():
     # The page, index.html next to progress.json, built from the spreadsheet, the plan and the
     # template; it reads progress.json when it is opened. It is built before anything is
     # written, so that if it can't be built neither file is updated.
-    page = os.path.join(os.path.dirname(os.path.abspath(a.out)), "index.html")
+    page = os.path.join(os.path.dirname(os.path.abspath(args.out)), "index.html")
     sheet = {"url": f"{SHEET}/edit?gid={SHEET_TAB}#gid={SHEET_TAB}", "read": now, "file": None}
     try:
-        if a.sheet:
-            with open(a.sheet, encoding="utf-8") as f:
+        if args.sheet:
+            with open(args.sheet, encoding="utf-8") as f:
                 sheet_text = f.read()
-            sheet["file"] = os.path.basename(a.sheet)
+            sheet["file"] = os.path.basename(args.sheet)
         else:
             sheet_text = fetch_sheet()
         text, _, sims, warnings = build_scheduler.page_text(sheet_text, sheet)
@@ -967,7 +920,7 @@ def main():
     # Each case's validation report is copied next to progress.json, where the web server
     # serves it, and only what has changed since the last run is copied. A report that can't
     # be copied is left without a link, with a warning, rather than stopping the update.
-    copies = os.path.join(os.path.dirname(os.path.abspath(a.out)), VALIDATION_COPIES)
+    copies = os.path.join(os.path.dirname(os.path.abspath(args.out)), VALIDATION_COPIES)
     for case in cases:
         if case.get("case") not in reports:
             continue
@@ -980,12 +933,12 @@ def main():
     # never reads a half-written file.
     written = []
     try:
-        for path, content in ((a.out, json.dumps(data, indent=1)), (page, text)):
+        for path, content in ((args.out, json.dumps(data, indent=1)), (page, text)):
             with open(path + ".tmp", "w", encoding="utf-8") as f:
                 f.write(content)
             written.append(path)
     except OSError as e:
-        for done in (a.out, page):
+        for done in (args.out, page):
             if os.path.exists(done + ".tmp"):
                 os.remove(done + ".tmp")
         raise Failed(f"{path} could not be written: {e}") from e
@@ -993,7 +946,7 @@ def main():
         os.replace(path + ".tmp", path)
     for w in warnings:
         print("warning:", w)
-    print(f"{a.out}: {len(cases)} cases")
+    print(f"{args.out}: {len(cases)} cases")
     print(f"{page}: {len(sims)} runs")
 
 
