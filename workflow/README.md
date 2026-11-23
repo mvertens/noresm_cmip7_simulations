@@ -292,12 +292,6 @@ removes from the copy what the report no longer has. A report that can't be
 copied, for example when the disk is full, leaves its case without a link and
 prints a warning; the rest of the tracker is still updated.
 
-The script also reads the report's `validation_summary.json` for each realm and
-frequency, and records a summary of it: how many variables were expected and
-produced, how many are missing, and how many have errors, in their files or in
-cmip7-prep's logs. The case's cmip7prep panel shows this summary as a table
-under the link to the report.
-
 #### cmor4cmip7 output
 
 The web page shows how many years of each simulation cmor4cmip7 has CMORized,
@@ -396,8 +390,8 @@ above the tables shows every run in the plan.
 - A cmip7prep chip shows the years cmip7-prep has fully CMORized for the case,
   e.g. `#002 1–50`. If no years are finished yet, it shows the years cmip7-prep
   has started on. Clicking the chip opens a panel with the case's output
-  directory, the steps that have not finished, if any, a link to the case's
-  validation report, and a summary of the report for each realm and frequency.
+  directory and a link to the case's validation report, which says what is
+  missing or wrong.
 - A cmor4cmip7 chip is red when the script found a problem with the case's
   files: years that some variables have and others lack, or a year that is in
   more than one file. Clicking it lists the problems.
