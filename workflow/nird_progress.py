@@ -172,11 +172,27 @@ def fetch_sheet():
     return text
 
 
+def check_issues(issues, source):
+    """Raises Failed unless issues is a list of issues as GitHub's API gives them, each with
+    a number, a title, labels and a user: anything else, such as an error message GitHub
+    sent instead, would otherwise give a page with wrong or missing runs."""
+    if not isinstance(issues, list):
+        raise Failed(f"{source} did not give a list of issues: {str(issues)[:200]}")
+    for i in issues:
+        ok = (isinstance(i, dict) and isinstance(i.get("number"), int) and isinstance(i.get("title"), str)
+              and isinstance(i.get("labels"), list) and isinstance(i.get("user"), dict))
+        if not ok:
+            raise Failed(f"{source} gave something that is not an issue: {str(i)[:200]}")
+
+
 def fetch_issues(repo):
-    """Every issue in the repository, open and closed, without pull requests."""
-    issues, page = [], 1
+    """Every issue in the repository, open and closed, without pull requests. Raises Failed
+    if GitHub gives anything but issues."""
+    issues = []
+    page = 1
     while True:
         batch = github_api(f"https://api.github.com/repos/{repo}/issues?state=all&per_page=100&page={page}")
+        check_issues(batch, f"GitHub's page {page} of {repo}'s issues")
         issues.extend(i for i in batch if "pull_request" not in i)
         # A page with fewer than a hundred is the last, so no empty page is fetched after it.
         if len(batch) < 100:
@@ -231,7 +247,8 @@ def xmlchange_calls(line):
         tokens = list(lexer)
     except ValueError:
         return []
-    calls, command = [], []
+    calls = []
+    command = []
     for token in tokens + [";"]:
         if token in COMMAND_SEPARATORS:
             if command and os.path.basename(command[0]) == "xmlchange":
@@ -247,7 +264,8 @@ def run_settings(text):
     xmlchange, either as KEY=value[,KEY=value] or as --id KEY --val value. A shell variable
     the script gives a plain value, such as refcase="...", is filled in; a setting whose value
     still depends on the shell, such as $(date), is left out."""
-    variables, settings = {}, {}
+    variables = {}
+    settings = {}
 
     def expand(value):
         return re.sub(r"\$\{(\w+)\}|\$(\w+)",
@@ -293,7 +311,8 @@ def script_case_name(text):
     # replaced first, since it may hold quotes of its own.
     text = re.sub(r"\\\n", " ", text)
     text = re.sub(r"\$\((?:[^()]|\([^()]*\))*\)|`[^`]*`", UNKNOWN, text)
-    variables, newcase = {}, None
+    variables = {}
+    newcase = None
     for line in text.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -347,17 +366,25 @@ def model_dates(directory, pattern):
     directory doesn't exist. A monthly file (no day) is dated at the start of the next month."""
     if not os.path.isdir(directory):
         return False
-    dates, years = [], set()
+    dates = []
+    years = set()
     for name in os.listdir(directory):
         if not fnmatch.fnmatchcase(name, pattern):
             continue
         m = DATE.search(name)
         if not m:
             continue
-        y, mo, d = int(m.group(1)), int(m.group(2)), m.group(3)
+        y = int(m.group(1))
+        mo = int(m.group(2))
+        d = m.group(3)
         years.add(y)
         if d is None:
-            y, mo = (y + 1, 1) if mo == 12 else (y, mo + 1)
+            # A monthly file is dated at the start of the next month.
+            if mo == 12:
+                y += 1
+                mo = 1
+            else:
+                mo += 1
             d = 1
         dates.append((y, mo, int(d)))
     if not dates:
@@ -425,7 +452,8 @@ def file_years(name):
 def output_size(paths, case):
     """{gb, years} for the netCDF files: their size, and how many model years their names
     cover; None if there are no dated ones."""
-    years, total = set(), 0
+    years = set()
+    total = 0
     for path in paths:
         if path.endswith(".nc") and (ys := file_years(os.path.basename(path).replace(case, ""))):
             years.update(ys)
@@ -483,7 +511,8 @@ def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, labels, kept=None):
     prep_cmor = os.path.join(prep_dir, "cmor") if prep_dir else None
     for tool, d in (("cmip7prep", prep_cmor), ("cmor4cmip7", cmor4cmip7_dir)):
         if tool not in cmor and d and os.path.isdir(d):
-            by_version, total = {}, 0
+            by_version = {}
+            total = 0
             for m, v, b in case_files(d, labels):
                 by_version.setdefault(v, set()).update(range(int(m.group(2)), int(m.group(3)) + 1))
                 total += b
@@ -536,11 +565,13 @@ def cmor_problems(directory, labels):
     years it affects: missing, the variables with no file for years other variables have;
     overlaps, the variables with a year in more than one file of the same version, by
     version. None if nothing is wrong."""
-    by_var, files = {}, {}
+    by_var = {}
+    files = {}
     for m, v, _ in case_files(directory, labels):
         by_var.setdefault(m.group(1), set()).update(range(int(m.group(2)), int(m.group(3)) + 1))
         t = CMOR_TIME.search(m.group(0))
-        start, end = t.group(1).ljust(14, "0"), t.group(2).ljust(14, "9")
+        start = t.group(1).ljust(14, "0")
+        end = t.group(2).ljust(14, "9")
         files.setdefault((m.group(1), v), []).append((start, end))
     every = set().union(*by_var.values()) if by_var else set()
     missing = {}
@@ -550,7 +581,8 @@ def cmor_problems(directory, labels):
     overlaps = {}
     for (var, v), spans in files.items():
         spans.sort()
-        years, end = set(), None
+        years = set()
+        end = None
         for s, e in spans:
             if end is not None and s <= end:
                 years.update(range(int(s[:4]), int(min(e, end)[:4]) + 1))
@@ -661,9 +693,18 @@ def main():
 
     if a.issues:
         with open(a.issues, encoding="utf-8") as f:
-            issues = [i for i in json.load(f) if "pull_request" not in i]
+            issues = json.load(f)
+        check_issues(issues, a.issues)
+        issues = [i for i in issues if "pull_request" not in i]
     else:
-        issues = fetch_issues(REPO)
+        try:
+            issues = fetch_issues(REPO)
+        except (OSError, ValueError, http.client.HTTPException) as e:
+            raise Failed(f"The case issues in {REPO} could not be read: {e}") from e
+    # The repository always has case issues, so none means GitHub's reply was wrong, and a
+    # page without them would show no progress at all.
+    if not issues:
+        raise Failed(f"No issues were read from {a.issues or REPO}.")
     # Only an issue whose title is a name, of letters, digits, ".", "-" and "_", is a case.
     # Any other title, such as one with a space, is a note or a placeholder for a run not
     # set up yet, and the issue is left out.
@@ -695,11 +736,15 @@ def main():
     # no run script, or whose script names no case, falls back to its title.
     tracked = []
     for issue in sorted(issues, key=lambda i: i["number"]):
-        num, title = issue["number"], issue["title"].strip()
+        num = issue["number"]
+        title = issue["title"].strip()
         labels = [l["name"] for l in issue.get("labels", [])]
         if "test" in labels:
             continue
-        script_paths, text, name, notes = scripts_of_issue.get(num, []), None, None, []
+        script_paths = scripts_of_issue.get(num, [])
+        text = None
+        name = None
+        notes = []
         if len(script_paths) == 1:
             text, why = read_run_script(REPO, script_paths[0], a.scripts)
             if text is None:
@@ -718,7 +763,8 @@ def main():
     # A case's parent is the issue whose case is its RUN_REFCASE.
     issue_of_case = {name: num for _, num, _, _, _, _, name, _ in tracked}
 
-    cases, skipped = [], []
+    cases = []
+    skipped = []
     for issue, num, title, labels, script_paths, text, name, notes in tracked:
         m = TITLE.match(name)
         if not m:

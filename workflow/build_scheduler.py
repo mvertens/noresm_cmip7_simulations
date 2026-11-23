@@ -227,7 +227,8 @@ def page_text(sheet_text, sheet):
     configs, sims, warnings = build(read_experiments(sheet_text), COSTS)
     with open(TEMPLATE, encoding="utf-8") as f:
         page = f.read()
-    s, e = page.find(START_MARKER), page.find(END_MARKER)
+    s = page.find(START_MARKER)
+    e = page.find(END_MARKER)
     if s < 0 or e < 0:
         raise ValueError(f"{TEMPLATE} has no default-data block")
     block = (START_MARKER + "\n" + literal(configs) + "\n  ];\n"

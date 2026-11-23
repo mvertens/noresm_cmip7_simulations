@@ -145,12 +145,21 @@ CMORized, what it costs and how much storage it needs. The script collects this
 information for every case issue, as described in the sections below.
 
 The script updates `progress.json` and `index.html` only if it has read
-everything and built the page without an error. If GitHub can't be read, a run
-script can't be read, the spreadsheet can't be downloaded, the spreadsheet has
-no runs in the plan, or the page can't be built, the script stops with a
-message saying why, and both files stay as they were. It builds the page before
-writing anything, writes both files to temporary files, and then moves them into
-place, so that the web page never reads a half-written file. For each
+everything and built the page without an error. The script stops with a
+message saying why, and both files stay as they were, if any of the following
+happens:
+
+- GitHub can't be read.
+- GitHub's reply is not a list of issues, each with a number, a title, labels
+  and a user, such as when GitHub sends an error message instead.
+- No case issues are read at all.
+- A run script can't be read.
+- The spreadsheet can't be downloaded, or has no runs in the plan.
+- The page can't be built.
+
+It builds the page before writing anything, writes both files to temporary
+files, and then moves them into place, so that the web page never reads a
+half-written file. For each
 issue, the script also prints one line with the issue's labels, the case's
 latest model date and its start date. A case with no output yet is marked
 "no output on NIRD", or "no run script on GitHub" if its run script is missing
