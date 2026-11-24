@@ -2399,6 +2399,10 @@
     });
   }
 
+  // When a case's last job ended, "YYYY-MM-DD HH:MM", from the jobs in its timing files on
+  // every machine; "" if it has none.
+  const lastJobEnd = c => (c.timing || []).flatMap(t => (t.runs || []).map(job => job[0])).sort().pop() || "";
+
   function applyAutoProgress(data){
     if (!data || typeof data !== "object" || !Array.isArray(data.cases)) return;
     progressData = data;
@@ -2414,8 +2418,10 @@
     sims.forEach(row => {
       if (!row.cases) return;
       row.owner = owners(row.cases);
-      // The run is on the machine its latest case's latest job ran on.
-      const latest = row.cases.filter(c => c.machine).sort((a, b) => a.issue - b.issue).pop();
+      // The run is costed on the machine its latest job ran on: that of the case whose last
+      // job ended last, by the end dates of the jobs in its timing files, "YYYY-MM-DD HH:MM".
+      const latest = row.cases.filter(c => c.machine)
+        .sort((a, b) => lastJobEnd(a).localeCompare(lastJobEnd(b))).pop();
       if (latest) row.machine = latest.machine;
       runs[row.name] = runProgress(row);
     });

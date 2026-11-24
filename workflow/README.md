@@ -444,6 +444,6 @@ above the tables shows every run in the plan.
   cost and throughput. Any other run uses the mean over all the cases of its
   configuration that have timing files. A configuration with no timing files at
   all keeps its estimate from `COSTS` in `build_scheduler.py`. A run is costed on
-  the machine its latest case ran on, and on Olivia until its cases have timing
-  files.
+  the machine its most recent job ran on, from the end dates of the jobs in its
+  cases' timing files, and on Olivia until its cases have timing files.
 - The output sizes give the storage estimate for each run in the Cost plan.
