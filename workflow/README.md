@@ -179,7 +179,9 @@ happens:
 
 It builds the page before writing anything, writes both files to temporary
 files, and then moves them into place, so that the web page never reads a
-half-written file. Each run's temporary files have names of their own, so a
+half-written file. The validation reports are copied just before, so if the
+two files can't be written, the copies may already be new; the script's
+message then says so. Each run's temporary files have names of their own, so a
 file left by a run that was stopped can't get in the way. Everything the
 script writes in the page's directory, including the copies of the validation
 reports, gets that directory's group and is writable by the group, whatever
@@ -305,8 +307,9 @@ is the name of another case, that case's issue is recorded as the parent.
 
 #### The CMORization issues
 
-The web page links each case to the CMORization issues that name it. The
-script records the number and state of each of these issues, along with the
+The web page links each case to the CMORization issues that name it. The name
+must appear on its own, so an issue that names a longer case name starting with
+it, such as a test case's, is not linked. The script records the number and state of each of these issues, along with the
 cmor tag version given in it.
 
 #### cmip7-prep output
@@ -316,7 +319,11 @@ When cmip7-prep starts a set of years, it makes `logs/<first>-<last>/` in the
 case's directory in `cmip7prep/` and writes a log there for each step it runs,
 finished or not. As the steps finish, it lists them in
 `completed_steps_<first>-<last>.json`. The script records each set that has
-either, so a set shows on the page as soon as it has started. For each set it
+either, so a set shows on the page as soon as it has started. A run without
+`--years`, of every year at once, writes its step logs in `logs/` itself and
+its record in `completed_steps.json`. The script reads it as one set, whose
+years are those its CMOR files and time series cover so far; until it has
+written any, it is not shown, and the script prints a line saying so. For each set it
 records the `cmor-` steps the file lists, and the `cmor-` steps that have a log
 but are not listed, which failed or are still running.
 
@@ -383,7 +390,10 @@ keeps only one, and multiplies by the size of a set.
 Measuring takes a long time, so a history, time series or CMOR size that has
 already been measured over at least five years is kept from the previous
 `progress.json`, as long as the issue's case is the same; a case whose name has
-changed is measured again. Restarts are measured on every run, since only the
+changed is measured again. cmip7-prep's time series and CMOR files are the
+exception: cmip7-prep writes them a realm at a time, so they are measured again
+whenever cmip7-prep has worked on the case since the last run, as its record of
+finished steps and its logs show. Restarts are measured on every run, since only the
 files' sizes are read. To measure every case
 again, for example after output on NIRD has been deleted or moved, or after a
 change to the history output, run the script once with `--remeasure-storage`. These

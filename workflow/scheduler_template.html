@@ -698,7 +698,7 @@
             <ul class="wf-parts">
               <li><b>where:</b> the progress script reads the case's own directory in <code>cmip7prep/</code>, not the ones below it;</li>
               <li><b>which issue:</b> each case has its own directory in <code>cmip7prep/</code>, named after the case, so everything in it belongs to that case's issue. piControl's #2 can be done while #11 is not;</li>
-              <li><b>years:</b> cmip7-prep makes <code>logs/&lt;first&gt;-&lt;last&gt;/</code> when it starts a set of years, and writes <code>completed_steps_&lt;first&gt;-&lt;last&gt;.json</code> as the set's steps finish. A set counts once it has finished every <code>cmor-</code> step that any of the simulation's sets has run, so a set where one realm failed doesn't count, even if that realm failed in every set. The chip shows the years of the sets that count, e.g. <code>#002 1–50</code>;</li>
+              <li><b>years:</b> cmip7-prep makes <code>logs/&lt;first&gt;-&lt;last&gt;/</code> when it starts a set of years, and writes <code>completed_steps_&lt;first&gt;-&lt;last&gt;.json</code> as the set's steps finish. A run without <code>--years</code> is one set, covering the years its output has so far. A set counts once it has finished every <code>cmor-</code> step that any of the simulation's sets has run, so a set where one realm failed doesn't count, even if that realm failed in every set. The chip shows the years of the sets that count, e.g. <code>#002 1–50</code>;</li>
               <li><b>no set counts yet:</b> the chip shows the years of all the sets, including one that has just started;</li>
               <li><b>validation report:</b> once the case has one, the chip is purple and clicking it links to the report, which says what is missing or wrong. cmip7-prep writes it to <code>cmor/validation_reports/</code>, and the progress script copies it next to the tracker;</li>
               <li><b>no validation report yet:</b> the chip is not filled in, and clicking it shows how far cmip7-prep has got with each set. cmip7-prep writes to a step's log while the step runs, so the panel names the step whose log was written last and when. If that step isn't finished and its log hasn't changed for two hours, the panel says it may have stopped.</li>
@@ -1477,7 +1477,12 @@
         p.appendChild(Object.assign(document.createElement("a"),
           { href: c.validationReport, target: "_blank", rel: "noopener", textContent: "Open the validation report" }));
       } else {
-        list("Progress", info.sets.length ? info.sets : ["Nothing started yet."]);
+        // A case with CMOR files but no step logs or record of finished steps, such as output
+        // copied without its logs/, has no sets to show, only the years of its files.
+        const fileYears = Object.values(info.versions).flat();
+        list("Progress", info.sets.length ? info.sets
+          : fileYears.length ? [`CMOR files for years ${yearSpans(fileYears)}, but no step logs or record of finished steps.`]
+          : ["Nothing started yet."]);
         list("Output directory", [c.output[tool] || "None found yet."]);
       }
       box.appendChild(pop);
@@ -2284,12 +2289,14 @@
         for (let y = s.first; y <= s.last; y++){ prepAny.push(y); if (ok) prepComplete.push(y); }
         // One line for the case's panel on how far the set has got.
         const notRun = expected.filter(k => !steps.includes(k) && !failed.includes(k));
-        // The step whose log was written last: running while its log keeps changing.
+        // The step whose log was written last, as the progress script saw it when it ran. A
+        // step that isn't finished may be running, or may have failed and stopped the run,
+        // and only a log that has not changed for long says which.
         const log = s.lastLog;
         const where = !log || ok ? ""
           : log.done ? ` Last step finished: ${log.step}, ${log.time}.`
           : log.stale ? ` ${log.step} may have stopped: its log has not changed since ${log.time}.`
-          : ` Running ${log.step}; its log was last written ${log.time}.`;
+          : ` Last step started: ${log.step}, not finished yet; its log was last written ${log.time}.`;
         prepSets.push(`${s.first}–${s.last}: ` + (ok ? "every cmor step has finished."
           : !steps.length && !failed.length ? "started; no cmor step has finished yet."
           : [`${steps.length} cmor step${steps.length === 1 ? "" : "s"} finished`,

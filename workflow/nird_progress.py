@@ -35,8 +35,13 @@ SHEET_TAB = "13331701"
 
 
 class Failed(Exception):
-    """Something the tracker needs could not be read, so neither progress.json nor the page
-    is updated."""
+    """Something the tracker needs could not be read or written, so neither progress.json nor
+    the page is updated. copied is whether the validation report copies had already been
+    updated by then."""
+
+    def __init__(self, message, copied=False):
+        super().__init__(message)
+        self.copied = copied
 
 
 # Where things are on NIRD. {case} is a case's name; {resolution}, {experiment} and
@@ -433,48 +438,109 @@ def model_dates(directory, pattern):
     return max(dates), [y for y in range(min(years), max(years)) if y not in years]
 
 
-def cmor_sets(directory):
-    """[{first, last, steps, failed, lastLog}] for each set of years cmip7-prep has started:
-    each logs/<first>-<last>/ directory and each completed_steps_<first>-<last>.json. steps
-    are the cmor- steps the json lists, the ones that finished; a set with no json yet has
-    none. failed are the cmor- steps that have a log in logs/<first>-<last>/ but are not
-    listed: they failed or are still running. The json alone can't show a realm that failed
-    in every set, since it lists no failures.
+def step_logs(logs):
+    """{step: modification time} for the step logs in a directory of cmip7-prep's logs. run.log,
+    the record of every run, is not a step's log.
+
+    logs: logs/<first>-<last>/, or logs/ itself for a run of every year."""
+    times = {}
+    for n in os.listdir(logs) if os.path.isdir(logs) else []:
+        if n.endswith(".log") and n != "run.log" and os.path.isfile(p := os.path.join(logs, n)):
+            try:
+                times[n[:-len(".log")]] = os.path.getmtime(p)
+            except OSError:
+                pass
+    return times
+
+
+def output_years(directory, case):
+    """(first, last): the model years cmip7-prep's output for the case covers so far, from the
+    time ranges in the names of its CMOR files and time series; None if it has none yet.
+
+    directory: cmip7-prep's output directory for the case, cmip7prep/<case>.
+    case: the case's name, which is taken out of a time series' name before it is dated."""
+    years = set()
+    for m, _, _ in cmor_files(os.path.join(directory, "cmor")):
+        years.update((int(m.group(2)), int(m.group(3))))
+    for d, _, names in os.walk(os.path.join(directory, "timeseries")):
+        for name in names:
+            if name.endswith(".nc") and (ys := file_years(name.replace(case, ""))):
+                years.update((ys[0], ys[-1]))
+    return (min(years), max(years)) if years else None
+
+
+def prep_changed(directory, since):
+    """Whether cmip7-prep has worked on the case since the time: whether a record of finished
+    steps, run.log or a step log has changed since. It reads only those small files, so it
+    is cheap even when the output is large.
+
+    directory: cmip7-prep's output directory for the case, cmip7prep/<case>.
+    since: the time, as seconds since the epoch, such as the last progress.json's; None for
+      always."""
+    if since is None:
+        return True
+    logs = os.path.join(directory, "logs")
+    paths = glob.glob(os.path.join(glob.escape(directory), "completed_steps*.json"))
+    paths += glob.glob(os.path.join(glob.escape(logs), "*.log"))
+    paths += glob.glob(os.path.join(glob.escape(logs), "*", "*.log"))
+    for path in paths:
+        try:
+            if os.path.getmtime(path) > since:
+                return True
+        except OSError:
+            pass
+    return False
+
+
+def cmor_sets(directory, case):
+    """[{first, last, steps, failed, lastLog}] for each set of years cmip7-prep has started.
+    A run with --years makes logs/<first>-<last>/ and completed_steps_<first>-<last>.json. A
+    run of every year puts its step logs in logs/ and writes completed_steps.json; its years
+    are those its output covers so far, and until it has output it is left out. steps are the
+    cmor- steps the json lists, the ones that finished; a set with no json yet has none.
+    failed are the cmor- steps that have a log but are not listed: they failed or are still
+    running. The json alone can't show a realm that failed in every set, since it lists no
+    failures.
 
     lastLog, for a set with step logs, is the step whose log was written last, as
-    {step, time, done, stale}. cmip7-prep writes to a step's log while the step runs, so a
-    step that isn't done and whose log changed less than STALE_LOG ago is running. One whose
-    log has not changed for longer may have stopped. done is whether the json lists the step.
+    {step, time, done, stale}. cmip7-prep writes to a step's log while the step runs. A step
+    that isn't done may be running or may have failed; once its log hasn't changed for
+    STALE_LOG, it may have stopped. done is whether the json lists the step.
 
-    directory: cmip7-prep's output directory for the case, cmip7prep/<case>."""
+    directory: cmip7-prep's output directory for the case, cmip7prep/<case>.
+    case: the case's name, as output_years() takes it."""
     logs_dir = os.path.join(directory, "logs")
-    years = set()
+    # Each set's (first, last), its json and its directory of step logs.
+    found_years = set()
     for path in glob.glob(os.path.join(glob.escape(directory), "completed_steps_*.json")):
         if m := COMPLETED.search(os.path.basename(path)):
-            years.add((int(m.group(1)), int(m.group(2))))
+            found_years.add((int(m.group(1)), int(m.group(2))))
     for name in os.listdir(logs_dir) if os.path.isdir(logs_dir) else []:
         if (m := LOG_YEARS.fullmatch(name)) and os.path.isdir(os.path.join(logs_dir, name)):
-            years.add((int(m.group(1)), int(m.group(2))))
+            found_years.add((int(m.group(1)), int(m.group(2))))
+    found = [(first, last, os.path.join(directory, f"completed_steps_{first}-{last}.json"),
+              os.path.join(logs_dir, f"{first}-{last}")) for first, last in sorted(found_years)]
+    every_year = os.path.join(directory, "completed_steps.json")
+    if os.path.isfile(every_year) or step_logs(logs_dir):
+        if years := output_years(directory, case):
+            found.append((*years, every_year, logs_dir))
+        else:
+            print(f"note: {directory} has a run of every year with no output yet, so it is not shown")
     now = datetime.datetime.now().astimezone()
     sets = []
-    for first, last in sorted(years):
+    for first, last, path, logs in found:
+        # cmip7-prep rewrites the json after every step, so it may be read half-written. Then
+        # the set counts as having no step finished on this run, and is still shown.
         listed = set()
-        path = os.path.join(directory, f"completed_steps_{first}-{last}.json")
         if os.path.isfile(path):
             try:
                 with open(path, encoding="utf-8") as f:
-                    listed = {k for k in json.load(f) if isinstance(k, str)}
+                    found = json.load(f)
+                listed = {k for k in found if isinstance(k, str)} if isinstance(found, list) else set()
             except (OSError, ValueError):
-                continue
+                print(f"warning: {path} could not be read; its steps count as not finished")
         steps = sorted(k for k in listed if k.startswith("cmor-"))
-        logs = os.path.join(logs_dir, f"{first}-{last}")
-        times = {}
-        for n in os.listdir(logs) if os.path.isdir(logs) else []:
-            if n.endswith(".log"):
-                try:
-                    times[n[:-len(".log")]] = os.path.getmtime(os.path.join(logs, n))
-                except OSError:
-                    pass
+        times = step_logs(logs)
         ran = {k for k in times if k.startswith("cmor-")}
         s = {"first": first, "last": last, "steps": steps, "failed": sorted(ran - set(steps))}
         if times:
@@ -858,8 +924,9 @@ def case_timing(directory):
 def main():
     """Reads the case issues and the CMORization issues on GitHub, the run scripts on the
     CMIP7_Runscripts branch, the case directories on NIRD and the spreadsheet, and writes
-    progress.json and the page. Raises Failed, and writes nothing, if anything it needs can't
-    be read or the page can't be built.
+    progress.json and the page. Raises Failed, and leaves both files as they were, if anything
+    it needs can't be read, the page can't be built, or the files can't be written. Only a
+    failure to write them comes after the validation reports have been copied.
 
     On NIRD the script is run with no arguments. Its two arguments are for testing a change
     without touching the published page, and for measuring the storage again."""
@@ -872,16 +939,19 @@ def main():
                              "on every run regardless")
     args = parser.parse_args()
 
-    # Each case's output as the last run measured it, kept where it covers enough years.
+    # Each case's output as the last run measured it, kept where it covers enough years, and
+    # when that run was.
     earlier = {}
+    earlier_time = None
     if not args.remeasure_storage:
         try:
             with open(args.out, encoding="utf-8") as f:
                 # By issue and case, so a case whose name has changed is measured again.
                 earlier = {(c["issue"], c.get("case")): settled_storage(c.get("storage"))
                            for c in json.load(f)["cases"]}
+            earlier_time = os.path.getmtime(args.out)
         except (OSError, ValueError, KeyError, TypeError):
-            pass
+            earlier = {}
 
     try:
         issues = fetch_issues(REPO)
@@ -1014,7 +1084,11 @@ def main():
                     (n for c, n in issue_of_case.items() if "*" in c and name_pattern(c, "*").match(refcase)), None):
                 start["parent"] = parent
             case["start"] = start
-        if found := [i for i in cmor_issues if name in i["title"] + "\n" + (i.get("body") or "")]:
+        # The name must stand on its own, so that a longer name that starts with it, such as
+        # a test case's ...002.20261016.oxid, does not count. A full stop after it may end a
+        # sentence.
+        named = re.compile(r"(?<![\w.-])" + re.escape(name) + r"(?![\w-])(?!\.[\w-])")
+        if found := [i for i in cmor_issues if named.search(i["title"] + "\n" + (i.get("body") or ""))]:
             case["cmorIssues"] = []
             for i in found:
                 ci = {"number": i["number"], "state": i["state"]}
@@ -1023,7 +1097,7 @@ def main():
                 case["cmorIssues"].append(ci)
         versions = {}
         if prep_dir := output.get("cmip7prep"):
-            sets = cmor_sets(prep_dir)
+            sets = cmor_sets(prep_dir, name)
             if sets:
                 case["cmor"] = sets
             # cmip7-prep writes its CMOR files under cmor/ in its output directory.
@@ -1043,7 +1117,14 @@ def main():
                 versions["cmor4cmip7"] = v
         if versions:
             case["cmorVersions"] = versions
-        kept = earlier.get((num, name), {})
+        kept = dict(earlier.get((num, name), {}))
+        # cmip7-prep's output grows a realm at a time, so a measurement made partway through a
+        # set is not a steady rate: it is measured again whenever cmip7-prep has worked on the
+        # case since the last run.
+        if prep_dir and prep_changed(prep_dir, earlier_time):
+            kept.pop("timeseries", None)
+            if "cmor" in kept:
+                kept["cmor"] = {t: v for t, v in kept["cmor"].items() if t != "cmip7prep"}
         storage = case_storage(CASE_DIR.format(case=name), name,
                                prep_dir, output.get("cmor4cmip7"), experiment, variant, kept)
         if storage:
@@ -1111,7 +1192,7 @@ def main():
         for tmp in temps.values():
             if os.path.exists(tmp):
                 os.remove(tmp)
-        raise Failed(f"{path} could not be written: {e}") from e
+        raise Failed(f"{path} could not be written: {e}", copied=bool(reports)) from e
     for path, tmp in temps.items():
         os.replace(tmp, path)
     for w in warnings:
@@ -1124,6 +1205,8 @@ if __name__ == "__main__":
     try:
         main()
     except Failed as e:
-        sys.exit(f"{e}\nNothing was updated: progress.json and the page are as they were.")
+        sys.exit(f"{e}\nprogress.json and the page are as they were."
+                 + (f" The validation report copies in {VALIDATION_COPIES}/ may have been updated."
+                    if e.copied else " Nothing was updated."))
     except (OSError, ValueError, http.client.HTTPException) as e:
         sys.exit(f"GitHub, the spreadsheet or NIRD could not be read: {e}\nNothing was updated: progress.json and the page are as they were.")
