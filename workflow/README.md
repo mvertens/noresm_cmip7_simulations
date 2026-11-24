@@ -23,6 +23,11 @@ read by the web page each time the page is opened in a browser.
 
 ### Input files
 
+The inputs fall into three groups: what the page is built from, what is read
+from GitHub, and what is read from NIRD.
+
+#### The page
+
 - **The experiments spreadsheet**
 
   The DECK_FASTTRACK tab of the
@@ -38,6 +43,8 @@ read by the web page each time the page is opened in a browser.
 
   This file contains the web page's layout, text and JavaScript.
 
+#### GitHub
+
 - **The case issues**
 
   The case issues are the issues in
@@ -48,16 +55,17 @@ read by the web page each time the page is opened in a browser.
 
   The run scripts are in the
   [scripts](https://github.com/NorESMhub/noresm_cmip7_simulations/tree/CMIP7_Runscripts/scripts)
-  sub-directory directory on this repository's `CMIP7_Runscripts`
-  branch. There is one run script for each case, and the name of each
-  run script starts with the number of its case issue. Each run script is in
-  `scripts/<MIP>/<experiment>/`, such as `scripts/CMIP/piControl/`, and this
-  directory gives the case's experiment.
+  directory on this repository's `CMIP7_Runscripts` branch. There is one run
+  script for each case, and the name of each run script starts with the number
+  of its case issue. Each run script is in `scripts/<MIP>/<experiment>/`, such
+  as `scripts/CMIP/piControl/`, and this directory gives the case's experiment.
 
 - **The CMORization issues**
 
   The CMORization issues are the issues in
   [NorESMhub/CMIP7_CMOR-Publish](https://github.com/NorESMhub/CMIP7_CMOR-Publish/issues).
+
+#### NIRD
 
 - **The model output**
 
