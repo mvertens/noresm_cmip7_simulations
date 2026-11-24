@@ -198,7 +198,7 @@
   .config-name-wrap{ display:flex; align-items:center; gap:8px; }
   .config-name-wrap input{ flex:1 1 auto; }
 
-  /* ---------- cost breakdown cards (by MIP, by priority, ...) ---------- */
+  /* ---------- cost breakdown cards (by MIP) ---------- */
   .cost-breakdown{ display:flex; flex-direction:column; gap:9px; }
   .cost-group-head{
     display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap;
@@ -671,7 +671,7 @@
               <summary>How the run is done and tracked</summary>
               <p>The progress script reads the run's Status and Progress on NIRD.</p>
               <p>Create and build the case. On Olivia and Betzy, cases go in <code>/cluster/projects/nn9560k/$USER</code>, each in a directory named after the case: <code>/cluster/projects/nn9560k/$USER/&lt;case&gt;</code>.</p>
-              <p>Set the run's priority and coordinate it with the other runs. Copy the output to NIRD by hand with rsync while the run is going. The progress script reads the years done from the atmosphere history files copied there, and the tracker shows them in the Progress column and sets the Status to In progress. To set it to Completed, add the <code class="wf-labelname">completed</code> label to its issue.</p>
+              <p>Copy the output to NIRD by hand with rsync while the run is going. The progress script reads the years done from the atmosphere history files copied there, and the tracker shows them in the Progress column and sets the Status to In progress. To set it to Completed, add the <code class="wf-labelname">completed</code> label to its issue.</p>
               <div class="wf-decide"><b>To decide:</b>
                 <ul>
                   <li>how often to write restarts (every 5 or 10 years?);</li>
@@ -692,7 +692,7 @@
             <p>Name each case the issue CMORizes by its case name, e.g. <code>NHistGhgGaxg.LM.nor30b29a.r2i1p1f1.020.20261113</code>, as the template asks. The progress script finds the CMORization issues that name a case, and the tracker links each after the case's issue as <a class="script-chip cmor-chip">cmor</a>. Clicking a case's chip in the cmip7prep or cmor4cmip7 column shows the CMORization issue and its cmor tag version too.</p>
             <div class="wf-decide"><b>To decide:</b> how urgency is shown.</div></li>
           <li id="wf-cmoratm"><div class="wf-title">CMORize the atmosphere, land, sea ice and land ice using cmip7-prep</div>
-            <p>The CMORized output goes in <code>/nird/datalake/NS9560K/noresm3/cases/$CASE.cmor</code> for now, and will later go in <code>/nird/datapeak/NS9034K</code> with the cmor4cmip7 output. The tracker's cmip7prep column shows it as follows:</p>
+            <p>The CMORized output goes in <code>/nird/datapeak/NS9560K/noresm3/cases/$CASE.cmor</code>. The cases CMORized before it moved to datapeak have theirs in <code>/nird/datalake/NS9560K/noresm3/cases/$CASE.cmor</code>, where the progress script looks when a case has no directory on datapeak. The tracker's cmip7prep column shows it as follows:</p>
             <ul class="wf-parts">
               <li><b>where:</b> the progress script reads the case's own <code>.cmor</code> directory, not the ones below it;</li>
               <li><b>which issue:</b> each case has its own <code>.cmor</code> directory, named after the case, so everything in it belongs to that case's issue. piControl's #2 can be done while #11 is not;</li>
@@ -776,15 +776,6 @@
     <div id="mipBreakdown" class="cost-breakdown"></div>
   </section>
 
-  <!-- Cost by priority is not shown: priority is 1 for DECK, 2 otherwise and 0 for off, so it repeats Cost by MIP. -->
-  <section class="card" id="priorityCard" hidden="">
-    <div class="editor-head">
-      <h2>Cost by priority</h2>
-      <p class="editor-caption" id="priorityCaption">Total compute cost (core-hr), grouped by each simulation's priority level.</p>
-    </div>
-    <div id="priorityBreakdown" class="cost-breakdown"></div>
-    <p class="cost-breakdown-note" id="priorityExcludedNote"></p>
-  </section>
 
   </div>
 
@@ -878,16 +869,12 @@
   const mipCard = el("mipCard");
   const mipCaption = el("mipCaption");
   const mipBreakdownEl = el("mipBreakdown");
-  const priorityCard = el("priorityCard");
-  const priorityCaption = el("priorityCaption");
-  const priorityBreakdownEl = el("priorityBreakdown");
-  const priorityExcludedNote = el("priorityExcludedNote");
   const simTables = el("simTables");
   let simTbody = null; // the table body rows are being added to
 
   // ---------------- cost ----------------
   // Each run's members as jobs, each with the cost it has left, and the total. A completed
-  // run, or one with priority 0, has no jobs. An in-progress run's first membersRunning
+  // run, or one with no members, has no jobs. An in-progress run's first membersRunning
   // members have only their remaining years to go; its other members, like a pending run's,
   // have all of them. A run on a configuration with no timing yet has no cost, so it is left
   // out and listed in untimedRows.
@@ -896,7 +883,7 @@
     const jobs = [];
     const untimedRows = [];
     sims.forEach(row => {
-      if (row.status === "completed" || normalizePriority(row.priority) === 0) return;
+      if (row.status === "completed") return;
       const cfg = configById.get(row.configId) || configs[0];
       if (!cfg) return;
       if (!hasTiming(cfg, row)){
@@ -913,7 +900,7 @@
       const running = inProgress ? runningCount(row) : 0;
       for (let k = 0; k < ens; k++){
         const frac = k < running ? progressFrac : 0;
-        jobs.push({ rowId: row.id, cost: years * (1 - frac) * costPerYear, rowPriority: normalizePriority(row.priority) });
+        jobs.push({ rowId: row.id, cost: years * (1 - frac) * costPerYear });
       }
     });
     const totalCost = jobs.reduce((s, j) => s + j.cost, 0);
@@ -1049,14 +1036,6 @@
     return Math.round(n).toLocaleString();
   }
   const STATUS_LABELS = { pending: "Pending", "in-progress": "In progress", completed: "Completed" };
-  // Priority 0 is a deliberate, meaningful value ("this run won't happen"), not a missing one —
-  // so unlike most numeric fields here, a falsy `|| 1` fallback would wrongly promote 0 back to
-  // 1. Only an actually blank/invalid value defaults to 1; an explicit 0 is preserved.
-  function normalizePriority(v){
-    if (v === undefined || v === null || v === "") return 1;
-    const n = Number(v);
-    return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 1;
-  }
 
   // ---------------- rendering ----------------
   function render(){
@@ -1068,7 +1047,7 @@
   // A table for each MIP at each resolution, as in the tracker, each with its own column
   // headings and the same column widths, so the columns line up from one to the next.
   const costTablesEl = el("costTables");
-  // Runs not in the plan for now (priority or ensemble 0) are in a table of their own at the
+  // Runs not in the plan for now (ensemble 0) are in a table of their own at the
   // bottom, closed until opened.
   let showOffRuns = false;
   // The columns' widths in %, from Simulation to CMOR TiB.
@@ -1210,7 +1189,7 @@
 
   function renderTimingNote(result){
     const rows = result.untimedRows || [];
-    const unsetEns = sims.filter(r => r.status !== "completed" && normalizePriority(r.priority) !== 0 && normalizeEnsemble(r.ensemble) === null);
+    const unsetEns = sims.filter(r => r.status !== "completed" && normalizeEnsemble(r.ensemble) === null);
     const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
     const ensMsg = unsetEns.length
       ? `<b>${unsetEns.length} run${unsetEns.length === 1 ? " has" : "s have"} no ensemble size yet</b> and ${unsetEns.length === 1 ? "is" : "are"} counted with one member.`
@@ -1438,71 +1417,14 @@
     renderCostRows(mipBreakdownEl, list, result.totalCost || 0, g => g.mip);
   }
 
-  // A priority-0 row never reaches computeCosts' job-building loop, so it has no job to
-  // read a cost off of. Mirror that loop's cost formula for a single row here instead, so the
-  // note below can report what the excluded runs would have cost. A completed run still
-  // nominally costs $0 either way — "excluded" means compute avoided, not compute already spent.
-  function rowNominalCost(row){
-    if (row.status === "completed") return 0;
-    const cfg = configs.find(c => c.id === row.configId) || configs[0];
-    if (!cfg) return 0;
-    const years = Math.max(Number(row.years) || 0, 0);
-    const ens = ensembleCount(row);
-    if (ens === 0) return 0;
-    const inProgress = row.status === "in-progress";
-    const yearsCompleted = inProgress ? Math.min(years, Math.max(0, Number(row.yearsCompleted) || 0)) : 0;
-    const progressFrac = years > 0 ? (yearsCompleted / years) : 0;
-    return years * (1 - progressFrac) * (Number(costOn(cfg, row)) || 0) * ens;
-  }
-
-  // Priority 0 means "won't be conducted" (see Ensemble 0) — those runs never produce a job,
-  // so they're inherently absent from this cost breakdown, not a zero-cost row within it.
-  // They're still worth surfacing, so a separate note below the bars reports how many there
-  // are and what they would have cost had they been left in.
-  function computePriorityBreakdown(result){
-    const groups = new Map();
-    result.jobs.forEach(job => {
-      const p = job.rowPriority;
-      const g = groups.get(p) || { priority: p, cost: 0, runCount: 0 };
-      g.cost += job.cost;
-      g.runCount += 1;
-      groups.set(p, g);
-    });
-    const excludedRows = sims.filter(r => normalizePriority(r.priority) === 0);
-    const excludedCost = excludedRows.reduce((sum, r) => sum + rowNominalCost(r), 0);
-    return { list: Array.from(groups.values()).sort((a, b) => a.priority - b.priority), excludedCount: excludedRows.length, excludedCost };
-  }
-
-  const SHOW_PRIORITY_CARD = false;
-  function renderPriorityBreakdown(result){
-    if (!SHOW_PRIORITY_CARD){ priorityCard.hidden = true; return; }
-    const { list, excludedCount, excludedCost } = computePriorityBreakdown(result);
-    if (list.length <= 1 && !excludedCount){
-      priorityCard.hidden = true;
-      priorityBreakdownEl.innerHTML = "";
-      priorityExcludedNote.hidden = true;
-      return;
-    }
-    priorityCard.hidden = false;
-    priorityCaption.textContent = `${currentCostLabel()} (${costUnit}), grouped by each simulation's priority level.`;
-    renderCostRows(priorityBreakdownEl, list, result.totalCost || 0, g => "Priority " + g.priority);
-    if (excludedCount){
-      priorityExcludedNote.hidden = false;
-      priorityExcludedNote.textContent = `+ ${excludedCount} run${excludedCount === 1 ? "" : "s"} switched off with Priority 0 — left out of the totals, would cost ${fmtCompact(excludedCost)} ${costUnit} if run.`;
-    } else {
-      priorityExcludedNote.hidden = true;
-    }
-  }
-
   function jobRowLookup(){
     const map = new Map();
     sims.forEach(r => map.set(r.id, r));
     return map;
   }
-  // Ensemble 0 and Priority 0 both mean "this run won't happen" — same visual treatment,
-  // same exclusion from the cost — just two different ways a user might express it.
+  // A run with no members, Ensemble 0, won't be run: it is left out of the cost.
   function isRowOff(row){
-    return ensembleCount(row) === 0 || normalizePriority(row.priority) === 0;
+    return ensembleCount(row) === 0;
   }
 
   // A CMORize cell's panel opens under its years, one at a time, and closes on a click
@@ -2204,7 +2126,6 @@
     renderTimingNote(result);
     renderStats(result);
     renderMipBreakdown(result);
-    renderPriorityBreakdown(result);
   }
 
   // ---------------- tabs ----------------

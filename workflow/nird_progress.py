@@ -49,8 +49,9 @@ HIST_DIR = CASE_DIR + "/atm/hist"
 HIST_PATTERN = "*.cam.i.*.nc"
 
 # Each tool's CMORized output: cmip7-prep's for each case, and cmor4cmip7's for each
-# simulation, shared by all its cases.
-CMIP7PREP_DIR = CASE_DIR + ".cmor"
+# simulation, shared by all its cases. cmip7-prep's is on datapeak, or, for the cases
+# CMORized before it moved there, next to the case on datalake; the first that exists is used.
+CMIP7PREP_DIRS = ("/nird/datapeak/NS9560K/noresm3/cases/{case}.cmor", CASE_DIR + ".cmor")
 CMOR4CMIP7_DIR = "/nird/datapeak/NS9034K/.CMIP7/NorESM3-{resolution}/{experiment}/{variant}"
 
 # cmip7-prep's validation report, below its output directory, and where the tracker keeps a
@@ -956,10 +957,10 @@ def main():
                 # The years with no file, as [[first, last], ...], e.g. [[1854, 1855], [1857, 1857]].
                 case["missingYears"] = year_ranges(missing)
         # Each tool's output directory, where it exists. cmip7-prep's is the case's .cmor
-        # directory. cmor4cmip7's is the simulation's, from the case's resolution, experiment
-        # and variant.
+        # directory, on datapeak or else on datalake. cmor4cmip7's is the simulation's, from
+        # the case's resolution, experiment and variant.
         output = {}
-        if os.path.isdir(d := CMIP7PREP_DIR.format(case=name)):
+        if d := next((d for d in (p.format(case=name) for p in CMIP7PREP_DIRS) if os.path.isdir(d)), None):
             output["cmip7prep"] = d
         if variant:
             d = CMOR4CMIP7_DIR.format(resolution=case["resolution"], experiment=experiment, variant=variant)

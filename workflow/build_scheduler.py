@@ -201,13 +201,11 @@ def build(experiments, costs):
                 "years": int(years) if years else 0,
                 "ensemble": int(ens) if ens is not None else None,
                 "configId": cfg_id[config_name(e, resolution, rules)],
-                "priority": 1 if tier == "DECK" else 2,
                 "status": "pending",
                 "yearsCompleted": 0,
                 "steps": [],
                 # The DECK experiments are grouped under their activity, CMIP.
                 "mip": "CMIP" if tier == "DECK" or activity in ("", "CMIP") else activity,
-                "cmipPriority": tier,
                 "amip": "Yes" if e.get("required_model_components", "").upper().startswith("AGCM") else "No",
             })
     return configs, sims, warnings
@@ -240,8 +238,8 @@ def page_text(sheet_text, sheet):
     2. For each resolution in the spreadsheet's Resolution column, it picks the experiments
        that column gives it for. Each becomes a run, e.g. "historical LM".
     3. Each run takes from the spreadsheet its members (Ensemble Members), its years per
-       member (min_yrs_per_sim), its start year, the parent it branches from, its MIP (DECK
-       runs are grouped under CMIP) and its priority (1 for DECK, 2 for the rest).
+       member (min_yrs_per_sim), its start year, the parent it branches from and its MIP
+       (DECK runs are grouped under CMIP).
     4. Each run is given a configuration from COSTS: one that lists the run's compset, or
        otherwise land-only, DCPP, AMIP, ESM or coupled, by the rule in this module's
        docstring.
