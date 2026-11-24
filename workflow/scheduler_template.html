@@ -884,7 +884,7 @@
     const untimedRows = [];
     sims.forEach(row => {
       if (row.status === "completed") return;
-      const cfg = configById.get(row.configId) || configs[0];
+      const cfg = configById.get(row.configId);
       if (!cfg) return;
       if (!hasTiming(cfg, row)){
         if (ensembleCount(row) > 0) untimedRows.push(row);
@@ -1062,7 +1062,7 @@
     const NCOLS = COST_COL_WIDTHS.length;
 
     const items = sims.map(r => {
-      const cfg = configs.find(c => c.id === r.configId) || configs[0];
+      const cfg = configs.find(c => c.id === r.configId);
       const res = resolutionOf(r);
       const off = isRowOff(r);
       const members = ensembleCount(r);
@@ -1201,7 +1201,7 @@
     }
     const byCfg = new Map();
     rows.forEach(r => {
-      const cfg = configs.find(c => c.id === r.configId) || configs[0];
+      const cfg = configs.find(c => c.id === r.configId);
       const name = cfg ? cfg.name : "?";
       if (!byCfg.has(name)) byCfg.set(name, []);
       byCfg.get(name).push(r.name);
@@ -1323,12 +1323,9 @@
   }
   // Colour of each resolution in Cost by MIP.
   const RES_SERIES = { "LM": 1, "MM": 7 };
-  // A run's resolution is its own; a row without one takes it from its configuration's name.
+  // A run's resolution, LM or MM, from the spreadsheet's Resolution column.
   function resolutionOf(row){
-    if (row && row.resolution) return row.resolution;
-    const cfg = configs.find(c => c.id === row.configId) || configs[0];
-    const m = cfg && /\b(LM|MM)\b/.exec(cfg.name || "");
-    return m ? m[0] : "";
+    return row.resolution || "";
   }
 
   // Shared row renderer for any "cost grouped by X" card — bars are scaled relative to the
@@ -1575,7 +1572,7 @@
       head.innerHTML = `<th colspan="${NCOLS}">${res}</th>`;
       expTimingTbody.appendChild(head);
       rows.forEach(r => {
-        const cfg = configs.find(c => c.id === r.configId) || configs[0];
+        const cfg = configs.find(c => c.id === r.configId);
         // One line for each machine the run has timing files on; a run with none yet gets
         // one line on its machine, with its configuration's value.
         const measured = MACHINES.filter(mc => ownTiming(r, mc));
