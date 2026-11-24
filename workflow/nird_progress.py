@@ -49,9 +49,10 @@ HIST_DIR = CASE_DIR + "/atm/hist"
 HIST_PATTERN = "*.cam.i.*.nc"
 
 # Each tool's CMORized output: cmip7-prep's for each case, and cmor4cmip7's for each
-# simulation, shared by all its cases. cmip7-prep's is on datapeak, or, for the cases
-# CMORized before it moved there, next to the case on datalake; the first that exists is used.
-CMIP7PREP_DIRS = ("/nird/datapeak/NS9560K/noresm3/cases/{case}.cmor", CASE_DIR + ".cmor")
+# simulation, shared by all its cases. cmip7-prep's is in its own directory, on datapeak or
+# on datalake; the first that exists is used.
+CMIP7PREP_DIRS = ("/nird/datapeak/NS9560K/noresm3/cmip7prep/{case}",
+                  "/nird/datalake/NS9560K/noresm3/cmip7prep/{case}")
 CMOR4CMIP7_DIR = "/nird/datapeak/NS9034K/.CMIP7/NorESM3-{resolution}/{experiment}/{variant}"
 
 # cmip7-prep's validation report, below its output directory, and where the tracker keeps a
@@ -361,7 +362,7 @@ def name_pattern(name, unknown):
     stands for one part of a case name without a dot, such as the 20261016 of
     $(date +%Y%m%d). So n1850GHGGaxg.LM.nor30b27.002.<date> fits
     n1850GHGGaxg.LM.nor30b27.002.20261016, but not ...002.20261022.oxidtest, a test made
-    with the same script, nor ...002.20261016.cmor, cmip7-prep's output.
+    with the same script, nor ...002.20261016.cmor, cmip7-prep's older output.
 
     name: a case name with unknown parts, such as script_case_name() gives.
     unknown: the character that marks each unknown part: UNKNOWN in a name from a run script,
@@ -429,7 +430,7 @@ def cmor_sets(directory):
     have a log in logs/<first>-<last>/, but are not listed: they failed or are still running.
     The file alone can't show a realm that failed in every set, since it lists no failures.
 
-    directory: cmip7-prep's output directory for the case, such as <case>.cmor."""
+    directory: cmip7-prep's output directory for the case, cmip7prep/<case>."""
     sets = []
     for path in glob.glob(os.path.join(glob.escape(directory), "completed_steps_*.json")):
         m = COMPLETED.search(os.path.basename(path))
@@ -551,7 +552,7 @@ def cmor_files(directory):
     the time range, from the variable to the grid, and groups 2 and 3 are its first and last
     year. The version is file_version()'s.
 
-    directory: one tool's CMOR output directory, such as <case>.cmor/cmor or CMOR4CMIP7_DIR."""
+    directory: one tool's CMOR output directory, such as cmip7prep/<case>/cmor or CMOR4CMIP7_DIR."""
     if directory not in _cmor_files:
         _cmor_files[directory] = [(m, file_version(d), size(os.path.join(d, name)))
                                   for d, _, names in os.walk(directory)
@@ -723,7 +724,7 @@ def case_files(directory, experiment, variant):
     case's CMOR files under the directory: those whose name has its experiment followed by
     its variant, as in so_Omon_NorESM3_piControl_r1i1p1f1_gn_000101-001012.nc.
 
-    directory: one tool's CMOR output directory, such as <case>.cmor/cmor or CMOR4CMIP7_DIR.
+    directory: one tool's CMOR output directory, such as cmip7prep/<case>/cmor or CMOR4CMIP7_DIR.
     experiment: the case's experiment, from its run script's directory, such as piControl.
     variant: the case's variant, from its issue's label, such as r1i1p1f1.
     Without both, the case has no files."""
@@ -750,7 +751,7 @@ def cmor_versions(directory, experiment, variant):
     """{version: [[first, last], ...]}: the years of the case's CMOR files under the
     directory, by the version directory they are in.
 
-    directory: one tool's CMOR output directory, such as <case>.cmor/cmor or CMOR4CMIP7_DIR.
+    directory: one tool's CMOR output directory, such as cmip7prep/<case>/cmor or CMOR4CMIP7_DIR.
     experiment, variant: the case's, which pick its files, as in case_files()."""
     by_version = {}
     for m, v, _ in case_files(directory, experiment, variant):
@@ -956,9 +957,9 @@ def main():
             if missing:
                 # The years with no file, as [[first, last], ...], e.g. [[1854, 1855], [1857, 1857]].
                 case["missingYears"] = year_ranges(missing)
-        # Each tool's output directory, where it exists. cmip7-prep's is the case's .cmor
-        # directory, on datapeak or else on datalake. cmor4cmip7's is the simulation's, from
-        # the case's resolution, experiment and variant.
+        # Each tool's output directory, where it exists. cmip7-prep's is the case's
+        # directory in cmip7prep/, on datapeak or else on datalake. cmor4cmip7's is the
+        # simulation's, from the case's resolution, experiment and variant.
         output = {}
         if d := next((d for d in (p.format(case=name) for p in CMIP7PREP_DIRS) if os.path.isdir(d)), None):
             output["cmip7prep"] = d

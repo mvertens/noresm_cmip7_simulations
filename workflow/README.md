@@ -68,9 +68,10 @@ read by the web page each time the page is opened in a browser.
 - **The cmip7-prep output**
 
   cmip7-prep writes the CMORized atmosphere, land, sea ice and land ice output
-  of each case to `/nird/datapeak/NS9560K/noresm3/cases/<case>.cmor`. The cases
-  CMORized before cmip7-prep moved to datapeak have theirs in
-  `/nird/datalake/NS9560K/noresm3/cases/<case>.cmor`. The script looks on
+  of each case to a directory named after the case in `noresm3/cmip7prep/`, on
+  datapeak or datalake:
+  `/nird/datapeak/NS9560K/noresm3/cmip7prep/<case>` or
+  `/nird/datalake/NS9560K/noresm3/cmip7prep/<case>`. The script looks on
   datapeak first, and uses datalake for a case with no directory on datapeak.
 
 - **The cmor4cmip7 output**
@@ -89,8 +90,9 @@ read by the web page each time the page is opened in a browser.
 - The scripts are run on NIRD, in the repository's clone at
   `/projects/NS9560K/www/diagnostics/noresm/noresm_cmip7_simulations`.
 - The user running the scripts needs read access to
-  `/nird/datalake/NS9560K/noresm3/cases`, `/nird/datapeak/NS9560K/noresm3/cases`
-  and `/nird/datapeak/NS9034K/.CMIP7`,
+  `/nird/datalake/NS9560K/noresm3/cases`, `noresm3/cmip7prep` in
+  `/nird/datapeak/NS9560K` and `/nird/datalake/NS9560K`, and
+  `/nird/datapeak/NS9034K/.CMIP7`,
   along with write access to
   `/nird/datalake/NS9560K/www/diagnostics/noresm/cmip7_planning`.
 - The scripts need internet access to `api.github.com`,
@@ -226,7 +228,7 @@ whose name fits. An unknown part stands for one part of the name without a
 dot: the run script of piControl's #2, with `n1850GHGGaxg.LM.nor30b27.002.$(date +"%Y%m%d")`,
 fits `n1850GHGGaxg.LM.nor30b27.002.20261016`, but not
 `n1850GHGGaxg.LM.nor30b27.002.20261022.oxidtest`, a test made with the same
-script, nor cmip7-prep's `n1850GHGGaxg.LM.nor30b27.002.20261016.cmor`. If
+script, nor cmip7-prep's older output, `n1850GHGGaxg.LM.nor30b27.002.20261016.cmor`. If
 several directories fit, the latest is used and the script says so. Until the
 case has a directory on NIRD, the unknown part is shown as `*`.
 
@@ -302,7 +304,7 @@ cmor tag version given in it.
 
 The web page shows how many years of each case cmip7-prep has CMORized.
 cmip7-prep writes a `completed_steps_<first>-<last>.json` file in the case's
-`.cmor` directory for each set of years it works on, listing the steps that
+directory in `cmip7prep/` for each set of years it works on, listing the steps that
 finished. It also writes a log for each step it runs, finished or not, in
 `logs/<first>-<last>/`. The script records the `cmor-` steps each file lists,
 and the `cmor-` steps that have a log but are not listed, which failed or are
@@ -316,7 +318,7 @@ directories, `vYYYYMMDD`, the CMORized files are in, along with the years in
 each version directory.
 
 cmip7-prep also writes a validation report, `cmor/validation_reports/index.html`
-in the case's `.cmor` directory. That directory is not served on the web, so
+in the case's directory in `cmip7prep/`. That directory is not served on the web, so
 the script copies each case's report next to `progress.json`, to
 `validation/<case>/`, and the page links to the copy. On each run it copies only
 the files that are new or have changed, by size and modification time, and
