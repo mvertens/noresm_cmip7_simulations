@@ -229,8 +229,9 @@ when it can be run again, and leaves `progress.json` and the page as they were.
 
 The script takes each case's name from its run script, not from the issue's
 title: it is the last part of the path the script gives `create_newcase
---case`, with the script's shell variables filled in. The case's directory on
-NIRD has this name. A part of the name the script only knows when it runs, such
+--case`, with the script's shell variables filled in. The script looks for the
+case's output on NIRD in the directory of that name,
+`/nird/datalake/NS9560K/noresm3/cases/<case>`. A part of the name the script only knows when it runs, such
 as the date from `$(date +%Y%m%d)`, is taken from the one directory on NIRD
 whose name fits. An unknown part stands for one part of the name without a
 dot: the run script of piControl's #2, with `n1850GHGGaxg.LM.nor30b27.002.$(date +"%Y%m%d")`,

@@ -377,7 +377,7 @@ def find_case(name, case_dir):
     several that fit, it is the latest by name, and None if none fits.
 
     name: the case name its run script gives, from script_case_name().
-    case_dir: where a case's directory is on NIRD, with {case} for its name: CASE_DIR."""
+    case_dir: where a case's output is on NIRD, with {case} for its name: CASE_DIR."""
     if UNKNOWN not in name:
         return name, []
     parent, last = os.path.split(case_dir)
@@ -667,7 +667,7 @@ def case_storage(case_dir, case, prep_dir, cmor4cmip7_dir, experiment, variant, 
     years counted. rest is the restart sets in rest/, as restart_sets() gives them. A kind with
     nothing on NIRD is left out.
 
-    case_dir: the case's directory on NIRD, CASE_DIR with its name.
+    case_dir: the directory of the case's output on NIRD, CASE_DIR with its name.
     case: the case's name.
     prep_dir: cmip7-prep's output directory for the case; None if it has none.
     cmor4cmip7_dir: cmor4cmip7's output directory for the case; None if it has none.
