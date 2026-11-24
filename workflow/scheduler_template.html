@@ -786,15 +786,15 @@
   "use strict";
 
   // ---------------- the plan ----------------
-  // build_scheduler.py replaces the five lines below with the configurations from its COSTS
-  // table, the runs built from the spreadsheet, the cost unit, no progress, and where and
-  // when the spreadsheet was read, so the template holds none.
+  // build_scheduler.py replaces the four lines below with the configurations from its COSTS
+  // table, the runs built from the spreadsheet, the cost unit, and where and when the
+  // spreadsheet was read, so the template holds none. The progress is never built in: the
+  // page reads progress.json each time it is opened.
   // It finds them by the DEFAULT_CONFIGS line and the configs line after them, so neither
   // may be changed or written out in full anywhere above them.
   let DEFAULT_CONFIGS = [];
   let DEFAULT_SIMS = [];
   let DEFAULT_COST_UNIT = "core-hr";
-  let DEFAULT_PROGRESS = null;
   let DEFAULT_SHEET = null;
 
   let configs = clone(DEFAULT_CONFIGS);
@@ -2459,7 +2459,8 @@
     p.innerHTML = `Plan built from the ${sheet} as read at <b>${clean(s.read)}</b>.`;
   })();
 
-  applyAutoProgress(DEFAULT_PROGRESS);
+  // The plan is drawn at once, and the progress is filled in when progress.json arrives, so
+  // the plan is still shown if it can't be read.
   render();
   if (/^https?:$/.test(location.protocol)){
     showProgressStatus("Reading the progress from NIRD…");
@@ -2471,11 +2472,9 @@
         showProgressStatus(`Last updated ${updatedOn(data)}.`);
       })
       .catch(err => showProgressStatus(`⚠ The progress could not be read (${String(err.message).replace(/[<>&]/g, "")})`
-        + (DEFAULT_PROGRESS ? `; showing the progress last updated ${updatedOn(DEFAULT_PROGRESS)}.` : ", so no run's progress is shown."), true));
+        + ", so no run's progress is shown.", true));
   } else {
-    showProgressStatus(DEFAULT_PROGRESS
-      ? `Last updated ${updatedOn(DEFAULT_PROGRESS)}.`
-      : "⚠ This page was opened as a local file, so no progress is shown.", !DEFAULT_PROGRESS);
+    showProgressStatus("⚠ This page was opened as a local file, so no progress is shown.", true);
   }
 })();
 </script></body></html>

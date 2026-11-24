@@ -261,7 +261,6 @@ def page_text(sheet_text, sheet):
         raise ValueError(f"{TEMPLATE} has no default-data block")
     block = (START_MARKER + "\n" + literal(configs) + "\n  ];\n"
              + "  let DEFAULT_SIMS = [\n" + literal(sims) + "\n  ];\n"
-             + "  let DEFAULT_PROGRESS = null;\n"
              + f"  let DEFAULT_SHEET = {script_json(sheet)};\n"
              + '  let DEFAULT_COST_UNIT = "core-hr";\n\n  ')
     return page[:s] + block + page[e:], configs, sims, warnings
