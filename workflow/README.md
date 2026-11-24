@@ -323,9 +323,13 @@ but are not listed, which failed or are still running.
 The file lists only steps that have finished, so it can't tell a running set
 from one that stopped. The logs can: cmip7-prep writes to a step's log while
 the step runs. For each set, the script records the step whose log was written
-last and when, and whether the file lists it. The page shows that step as
-running. If the step isn't listed and its log hasn't changed for two hours,
-the page says it may have stopped.
+last and when, and whether the file lists it.
+
+A case's cmip7prep chip is purple once the case has a validation report, and
+clicking it opens the report, which says what is missing or wrong. Until then
+the chip is not filled in, and clicking it shows how far each set has got: the
+step whose log was written last and when. If that step isn't listed and its
+log hasn't changed for two hours, the page says it may have stopped.
 
 A set of years counts as CMORized once it has finished every `cmor-` step that
 any set of the same simulation has run. So a set in which one realm failed does

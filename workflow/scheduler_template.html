@@ -522,8 +522,8 @@
   #simTables .th-note{ font-size: 10px; font-weight: 500; color: var(--series-1); white-space: nowrap; }
   #simTables td.step-c .step-range{ display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 11px; white-space: nowrap; padding: 1px 6px; border-radius: 8px; color: var(--text-primary); background: color-mix(in srgb, var(--series-7) 18%, transparent); }
   #simTables td.step-c .step-range.done{ font-weight: 700; }
-  /* A case with output but no year fully CMORized yet, such as a set cmip7-prep has just started. */
-  #simTables td.step-c .step-range.partial{ color: var(--text-muted); background: transparent; outline: 1px dashed color-mix(in srgb, var(--series-7) 60%, transparent); outline-offset: -1px; }
+  /* A cmip7prep chip for a case with no validation report yet: not filled in. */
+  #simTables td.step-c .step-range.no-report{ background: transparent; outline: 1px solid color-mix(in srgb, var(--series-7) 45%, transparent); outline-offset: -1px; }
   /* Several cases' cmip7prep chips wrap, one under the other. */
   #simTables td.step-c .step-ranges{ display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
   /* A CMORize cell's years open a panel with where the output is, its version directories and
@@ -699,9 +699,9 @@
               <li><b>where:</b> the progress script reads the case's own directory in <code>cmip7prep/</code>, not the ones below it;</li>
               <li><b>which issue:</b> each case has its own directory in <code>cmip7prep/</code>, named after the case, so everything in it belongs to that case's issue. piControl's #2 can be done while #11 is not;</li>
               <li><b>years:</b> cmip7-prep makes <code>logs/&lt;first&gt;-&lt;last&gt;/</code> when it starts a set of years, and writes <code>completed_steps_&lt;first&gt;-&lt;last&gt;.json</code> as the set's steps finish. A set counts once it has finished every <code>cmor-</code> step that any of the simulation's sets has run, so a set where one realm failed doesn't count, even if that realm failed in every set. The chip shows the years of the sets that count, e.g. <code>#002 1–50</code>;</li>
-              <li><b>no set counts yet:</b> the chip shows the years of all the sets, including one that has just started, with a dashed outline. Clicking it shows how far each set has got;</li>
-              <li><b>running or stopped:</b> cmip7-prep writes to a step's log while the step runs. For a set that isn't done, the chip's panel names the step whose log was written last and when. If that step isn't finished and its log hasn't changed for two hours, the panel says it may have stopped;</li>
-              <li><b>validation report:</b> clicking the chip links to the case's validation report, which cmip7-prep writes to <code>cmor/validation_reports/</code> and the progress script copies next to the tracker.</li>
+              <li><b>no set counts yet:</b> the chip shows the years of all the sets, including one that has just started;</li>
+              <li><b>validation report:</b> once the case has one, the chip is purple and clicking it links to the report, which says what is missing or wrong. cmip7-prep writes it to <code>cmor/validation_reports/</code>, and the progress script copies it next to the tracker;</li>
+              <li><b>no validation report yet:</b> the chip is not filled in, and clicking it shows how far cmip7-prep has got with each set. cmip7-prep writes to a step's log while the step runs, so the panel names the step whose log was written last and when. If that step isn't finished and its log hasn't changed for two hours, the panel says it may have stopped.</li>
             </ul></li>
           <li id="wf-cmorocn"><div class="wf-title">CMORize the ocean and ocean biogeochemistry using cmor4cmip7</div>
             <p>The CMORized output goes in <code>/nird/datapeak/NS9034K/.CMIP7</code>, under the model, experiment, variant and version, e.g. <code>NorESM3-LM/piControl/r1i1p1f1/v20261028</code>. The tracker's cmor4cmip7 column shows it as follows:</p>
@@ -1429,20 +1429,21 @@
 
   // A CMORize cell's panel opens under its years, one at a time, and closes on a click
   // elsewhere or Escape.
-  // One case's chip in a CMORize cell, "#002 1–170", and the panel it opens: its years, its
-  // output directory, its CMORization issue and the version directories its files are in,
-  // and for cmip7-prep a link to its validation report, which says what is missing or wrong.
   // The link to a case's copy of its validation report, as progress.json gives it.
   const VALIDATION_LINK = /^validation\/[A-Za-z0-9._-]+\/index\.html$/;
+  // One case's chip in a CMORize cell, "#002 1–170", and the panel it opens. For cmor4cmip7
+  // the panel gives the case's years, output directory, CMORization issue and the version
+  // directories its files are in. For cmip7-prep it links to the validation report, which
+  // says what is missing or wrong, or without one shows how far cmip7-prep has got.
   function cmorCaseBox(row, step, { member, c, info }, byVariant){
     const tool = step.key === "cmoratm" ? "cmip7prep" : "cmor4cmip7";
     const box = document.createElement("details");
     box.className = "cmor-box";
     const summary = document.createElement("summary");
     const chip = document.createElement("span");
-    // A case with no year fully CMORized yet shows the years it has started, with a dashed
-    // outline.
-    chip.className = "step-range" + (info.years.length ? "" : " partial");
+    // A cmip7prep chip is filled in once the case has a validation report.
+    const report = tool === "cmip7prep" && VALIDATION_LINK.test(c.validationReport || "");
+    chip.className = "step-range" + (tool === "cmip7prep" && !report ? " no-report" : "");
     chip.textContent = `#${String(c.issue).padStart(3, "0")} ${yearSpans(info.years.length ? info.years : info.files)}`;
     summary.appendChild(chip);
     box.appendChild(summary);
@@ -1467,25 +1468,27 @@
     };
     const versions = Object.entries(info.versions);
     add("h4", null, `#${c.issue}, ${row.name}${byVariant ? " " + member.variant : ""}: ${tool}`);
+    // cmip7-prep's validation report, which nird_progress.py copies next to the page, says
+    // everything about the case's output, so the panel links to it and nothing else. Until
+    // there is one, the panel shows how far cmip7-prep has got.
+    if (tool === "cmip7prep"){
+      if (report){
+        const p = add("p");
+        p.appendChild(Object.assign(document.createElement("a"),
+          { href: c.validationReport, target: "_blank", rel: "noopener", textContent: "Open the validation report" }));
+      } else {
+        list("Progress", info.sets.length ? info.sets : ["Nothing started yet."]);
+        list("Output directory", [c.output[tool] || "None found yet."]);
+      }
+      box.appendChild(pop);
+      return box;
+    }
     const caseYears = c.shownTo === Infinity ? `from ${c.from}` : `${c.from}–${c.shownTo}`;
     list("Years", [
       `The case runs years ${caseYears}${c.to === Infinity ? " so far" : ""}.`,
       info.years.length ? `Fully CMORized: ${yearSpans(info.years)}.` : "None fully CMORized yet.",
     ]);
-    if (info.sets && info.sets.length) list("cmip7-prep's sets of years", info.sets);
     list("Output directory", [c.output[tool] || "None found yet."]);
-    // cmip7-prep's validation report, which nird_progress.py copies next to the page.
-    if (tool === "cmip7prep"){
-      add("div", "cp-head", "Validation report");
-      const ul = add("ul"), li = document.createElement("li");
-      if (VALIDATION_LINK.test(c.validationReport || "")){
-        li.appendChild(Object.assign(document.createElement("a"),
-          { href: c.validationReport, target: "_blank", rel: "noopener", textContent: "Open the validation report" }));
-      } else {
-        li.textContent = "None yet: cmip7-prep writes it to cmor/validation_reports/ in the output directory.";
-      }
-      ul.appendChild(li);
-    }
     add("div", "cp-head", "CMORization issue");
     const issues = add("ul");
     if (!c.cmorIssues.length) issues.appendChild(Object.assign(document.createElement("li"),
