@@ -312,12 +312,20 @@ cmor tag version given in it.
 #### cmip7-prep output
 
 The web page shows how many years of each case cmip7-prep has CMORized.
-cmip7-prep writes a `completed_steps_<first>-<last>.json` file in the case's
-directory in `cmip7prep/` for each set of years it works on, listing the steps that
-finished. It also writes a log for each step it runs, finished or not, in
-`logs/<first>-<last>/`. The script records the `cmor-` steps each file lists,
-and the `cmor-` steps that have a log but are not listed, which failed or are
-still running.
+When cmip7-prep starts a set of years, it makes `logs/<first>-<last>/` in the
+case's directory in `cmip7prep/` and writes a log there for each step it runs,
+finished or not. As the steps finish, it lists them in
+`completed_steps_<first>-<last>.json`. The script records each set that has
+either, so a set shows on the page as soon as it has started. For each set it
+records the `cmor-` steps the file lists, and the `cmor-` steps that have a log
+but are not listed, which failed or are still running.
+
+The file lists only steps that have finished, so it can't tell a running set
+from one that stopped. The logs can: cmip7-prep writes to a step's log while
+the step runs. For each set, the script records the step whose log was written
+last and when, and whether the file lists it. The page shows that step as
+running. If the step isn't listed and its log hasn't changed for two hours,
+the page says it may have stopped.
 
 A set of years counts as CMORized once it has finished every `cmor-` step that
 any set of the same simulation has run. So a set in which one realm failed does

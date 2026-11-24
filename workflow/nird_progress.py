@@ -76,6 +76,15 @@ DATE = re.compile(r"\.(\d{4})-(\d{2})(?:-(\d{2})(?:-\d{5})?)?\.nc$")
 # cmip7-prep's record of the steps that finished for one set of years.
 COMPLETED = re.compile(r"completed_steps_(\d+)-(\d+)\.json$")
 
+# The directory of one set of years' step logs, in cmip7-prep's logs/: 101-150. cmip7-prep
+# makes it when it starts the set, before any step has finished.
+LOG_YEARS = re.compile(r"(\d+)-(\d+)")
+
+# How long a running step's log may go unchanged before the tracker says the run may have
+# stopped. A step can write nothing for most of an hour, e.g. while it makes one batch of
+# daily time series.
+STALE_LOG = datetime.timedelta(hours=2)
+
 # A CMOR file's variable and the years of its time range, before .nc:
 # so_Omon_NorESM3_piControl_r1i1p1f1_gn_000101-001012.nc
 CMOR_FILE = re.compile(r"^(.+)_(\d{4})\d*-(\d{4})\d*\.nc$")
@@ -425,28 +434,56 @@ def model_dates(directory, pattern):
 
 
 def cmor_sets(directory):
-    """[{first, last, steps, failed}] for each completed_steps_<first>-<last>.json. steps are
-    the cmor- steps it lists, the ones that finished. failed are the cmor- steps that ran, so
-    have a log in logs/<first>-<last>/, but are not listed: they failed or are still running.
-    The file alone can't show a realm that failed in every set, since it lists no failures.
+    """[{first, last, steps, failed, lastLog}] for each set of years cmip7-prep has started:
+    each logs/<first>-<last>/ directory and each completed_steps_<first>-<last>.json. steps
+    are the cmor- steps the json lists, the ones that finished; a set with no json yet has
+    none. failed are the cmor- steps that have a log in logs/<first>-<last>/ but are not
+    listed: they failed or are still running. The json alone can't show a realm that failed
+    in every set, since it lists no failures.
+
+    lastLog, for a set with step logs, is the step whose log was written last, as
+    {step, time, done, stale}. cmip7-prep writes to a step's log while the step runs, so a
+    step that isn't done and whose log changed less than STALE_LOG ago is running. One whose
+    log has not changed for longer may have stopped. done is whether the json lists the step.
 
     directory: cmip7-prep's output directory for the case, cmip7prep/<case>."""
-    sets = []
+    logs_dir = os.path.join(directory, "logs")
+    years = set()
     for path in glob.glob(os.path.join(glob.escape(directory), "completed_steps_*.json")):
-        m = COMPLETED.search(os.path.basename(path))
-        if not m:
-            continue
-        try:
-            with open(path, encoding="utf-8") as f:
-                steps = sorted(k for k in json.load(f) if isinstance(k, str) and k.startswith("cmor-"))
-        except (OSError, ValueError):
-            continue
-        logs = os.path.join(directory, "logs", f"{m.group(1)}-{m.group(2)}")
-        ran = {n[:-len(".log")] for n in (os.listdir(logs) if os.path.isdir(logs) else [])
-               if n.startswith("cmor-") and n.endswith(".log")}
-        sets.append({"first": int(m.group(1)), "last": int(m.group(2)), "steps": steps,
-                     "failed": sorted(ran - set(steps))})
-    return sorted(sets, key=lambda s: s["first"])
+        if m := COMPLETED.search(os.path.basename(path)):
+            years.add((int(m.group(1)), int(m.group(2))))
+    for name in os.listdir(logs_dir) if os.path.isdir(logs_dir) else []:
+        if (m := LOG_YEARS.fullmatch(name)) and os.path.isdir(os.path.join(logs_dir, name)):
+            years.add((int(m.group(1)), int(m.group(2))))
+    now = datetime.datetime.now().astimezone()
+    sets = []
+    for first, last in sorted(years):
+        listed = set()
+        path = os.path.join(directory, f"completed_steps_{first}-{last}.json")
+        if os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    listed = {k for k in json.load(f) if isinstance(k, str)}
+            except (OSError, ValueError):
+                continue
+        steps = sorted(k for k in listed if k.startswith("cmor-"))
+        logs = os.path.join(logs_dir, f"{first}-{last}")
+        times = {}
+        for n in os.listdir(logs) if os.path.isdir(logs) else []:
+            if n.endswith(".log"):
+                try:
+                    times[n[:-len(".log")]] = os.path.getmtime(os.path.join(logs, n))
+                except OSError:
+                    pass
+        ran = {k for k in times if k.startswith("cmor-")}
+        s = {"first": first, "last": last, "steps": steps, "failed": sorted(ran - set(steps))}
+        if times:
+            step = max(times, key=times.get)
+            when = datetime.datetime.fromtimestamp(times[step]).astimezone()
+            s["lastLog"] = {"step": step, "time": when.strftime("%Y-%m-%d %H:%M %Z"),
+                            "done": step in listed, "stale": now - when > STALE_LOG}
+        sets.append(s)
+    return sets
 
 
 # What the tracker writes next to progress.json gets the group of that directory, and is
