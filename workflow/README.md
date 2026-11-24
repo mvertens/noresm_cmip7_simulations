@@ -332,10 +332,13 @@ from one that stopped. The logs can: cmip7-prep writes to a step's log while
 the step runs. For each set, the script records the step whose log was written
 last and when, and whether the file lists it.
 
-A case's cmip7prep chip is purple once the case has a validation report, and
-clicking it opens the report, which says what is missing or wrong. Until then
-the chip is not filled in, and clicking it shows how far each set has got: the
-step whose log was written last and when. If that step isn't listed and its
+A case's cmip7prep chip is purple once the case has a validation report.
+Clicking it gives the case's years, the years each cmip7-prep run was given,
+such as `1850–1859, 1860–1869`, which the report doesn't say, the output
+directory, a link to the report, which says what is missing or wrong, the
+CMORization issue and the version directories of its files. Until there is a
+report, the chip is not filled in, and its panel also shows how far each set
+has got: the step whose log was written last and when. If that step isn't listed and its
 log hasn't changed for two hours, the page says it may have stopped.
 
 A set of years counts as CMORized once it has finished every `cmor-` step that
