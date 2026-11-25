@@ -1,7 +1,7 @@
 """Write progress.json for the tracker from the GitHub issues and the files on NIRD, and
 build the tracker page, index.html, next to it.
 
-workflow/README.md describes what it reads and records.
+workflow/Technical_Description.md describes what it reads and records.
 """
 
 import argparse
