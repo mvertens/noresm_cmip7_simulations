@@ -262,6 +262,8 @@
   .cost-table td{ overflow: hidden; text-overflow: ellipsis; }
   .cost-table tr.ct-title th{ text-align: left; font-size: 13.5px; font-weight: 700; color: var(--series-1); background: color-mix(in srgb, var(--series-1) 12%, transparent); border-top: 2px solid var(--text-secondary); }
   .cost-table tr.ct-cols th{ white-space: normal; font-size: 11.5px; vertical-align: bottom; }
+  .cost-table tr.ct-groups th{ text-align: center; font-size: 12px; font-weight: 700; padding-top: 6px; padding-bottom: 2px; }
+  .cost-table tr.ct-groups th:not(:first-child){ border-left: 1px solid var(--border); border-bottom: 1px solid var(--border-strong); }
   #costTables p.ct-note{ color: var(--text-muted); font-size: 12px; margin: 12px 0 0; }
   /* Resolution heading rows in the configuration table. */
   #expTimingTable tr.cfg-res th{
@@ -273,14 +275,16 @@
   .cost-table tr.ct-off td{ color: var(--text-muted); }
   .cost-table .ct-name{ font-weight: 600; }
   .cost-table .ct-muted{ color: var(--text-muted); }
-  /* An estimated value has an orange background and orange italics, so it doesn't rest on the text's colour alone. */
-  .cost-table td.ct-est, #expTimingTable td.estimate, .est-key{ color: var(--estimate); background: var(--estimate-wash); font-style: italic; }
-  .est-key{ padding: 0 4px; border-radius: 3px; }
+  /* An estimated value sits in an orange pill, in orange italics; the cell itself is not shaded. */
+  .est-val, .est-key{ display: inline-block; padding: 0 7px; border-radius: 999px; color: var(--estimate); background: var(--estimate-wash); font-style: italic; }
   .est-legend{ display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 10px; font-size: 12.5px; color: var(--text-secondary); }
   .est-legend .meas-key{ color: var(--text-primary); font-family: "JetBrains Mono", monospace; }
   .est-legend .est-key{ font-family: "JetBrains Mono", monospace; }
-  /* The storage columns start after a line, apart from the compute columns. */
-  .cost-table th.ct-storage-start, .cost-table td:nth-last-child(4){ border-left: 1px solid var(--border); }
+  /* The compute columns start after a line, after Member-years, and the storage columns
+     after another. In a totals row, the cell after Member-years is the third. */
+  .cost-table th.ct-storage-start, .cost-table td:nth-last-child(4),
+  .cost-table tr.ct-cols > th:nth-child(5), .cost-table tr:not(.ct-total):not(.ct-cols) > td:nth-child(5),
+  .cost-table tr.ct-total > td:nth-child(3){ border-left: 1px solid var(--border); }
   .cost-table .ct-groupinfo{ margin-left: 10px; font-weight: 400; color: var(--text-secondary); }
   #expTimingTable .cfg-machine-start{ border-left: 1px solid color-mix(in srgb, var(--text-primary) 30%, transparent); padding-left: 12px; }
   #expTimingTable .cfg-num{ text-align: center; }
@@ -758,7 +762,7 @@
       <p class="editor-caption">The runs with a case issue, with their cost and throughput on each machine.</p>
       <ul class="caption-list">
         <li><b>Measured:</b> from the run's timing files on <span class="machine-tag">Olivia</span> or <span class="machine-tag machine-betzy">Betzy</span>, the mean over its jobs, each weighted by the years it simulated. Click a run's job count to plot its SYPD and cost job by job.</li>
-        <li><b>Estimated:</b> a run with no timing files on a machine yet shows its configuration's value in <span class="est-key">orange shading</span>, and is costed with it.</li>
+        <li><b>Estimated:</b> a run with no timing files on a machine yet shows its configuration's value in <span class="est-key">an orange pill</span>, and is costed with it.</li>
       </ul>
     </div>
     <div class="table-scroll">
@@ -801,7 +805,7 @@
             <li>Restarts are members × the restart sets each member will keep × the GiB of one set.</li>
           </ul>
         </li>
-        <li><b>Measured or estimated:</b> a value is measured if the run has timing files or output of its own on NIRD. Otherwise it is an estimate taken from its configuration, and shown in <span class="est-key">orange shading</span>. Hover a value for where it comes from, or open "Where the estimates come from" below the index.</li>
+        <li><b>Measured or estimated:</b> a value is measured if the run has timing files or output of its own on NIRD. Otherwise it is an estimate taken from its configuration, and shown in <span class="est-key">an orange pill</span>. Hover a value for where it comes from, or open "Where the estimates come from" below the index.</li>
       </ul>
     </div>
     <div id="costTables"></div>
@@ -1041,7 +1045,7 @@
       ? `${r.setGib.toFixed(1)} GiB per restart set, ${r.everyYears ? `one every ${r.everyYears} years, so ${restSets(r, it.years)} sets per member` : "one set kept per member"}, ${from}`
       : `${r.rate.toFixed(2)} GiB per simulated year, ${from}`
         + (r.parts ? "\n" + Object.entries(r.parts).map(([p, g]) => `${p}: ${g.toFixed(2)} GiB`).join("\n") : "");
-    return `<td class="n${r.own ? "" : " ct-est"}" title="${title.replace(/"/g, "&quot;")}">${fmtTB(v)}</td>`;
+    return `<td class="n${r.own ? "" : " ct-est"}" title="${title.replace(/"/g, "&quot;")}">${r.own ? fmtTB(v) : `<span class="est-val">${fmtTB(v)}</span>`}</td>`;
   }
   // A blank ensemble size is "not decided yet": it schedules one member and is flagged.
   // An explicit 0 excludes the run.
@@ -1137,7 +1141,7 @@
       const ens = normalizeEnsemble(it.r.ensemble);
       // A cost or throughput cell, in the estimate's colour when the run has no timing of its own.
       const timed = text => it.est && !it.off
-        ? `<td class="n ct-est" title="${esc(it.estFrom)}">${text}</td>`
+        ? `<td class="n ct-est" title="${esc(it.estFrom)}"><span class="est-val">${text}</span></td>`
         : `<td class="n">${text}</td>`;
       return `<tr${it.off ? ' class="ct-off"' : ""}>`
         + `<td class="ct-name" title="${esc(it.name)}">${esc(it.name)}${machineOf(it.r).key !== MACHINES[0].key ? ` <span class="ct-muted" title="Costed on ${machineOf(it.r).label}, where its timing files say it runs">on ${machineOf(it.r).label}</span>` : ""}</td>`
@@ -1168,7 +1172,12 @@
     };
     const totalsRow = (label, list) => `<tr class="ct-total"><td colspan="3">${label}</td><td class="n">${fmtN(sum(list, "memberYears"))}</td>`
       + `<td colspan="2"></td>${coreTotal(list)}${daysTotal(list)}` + storageSums(list) + "</tr>";
-    const columnHeads = '<tr class="ct-cols"><th>Simulation</th>'
+    // Above the column headings, "Cost" spans the four compute columns and "Storage" the four
+    // storage columns.
+    const groupHeads = '<tr class="ct-groups"><th colspan="4"></th>'
+      + '<th colspan="4" title="The cost of running the model">Cost</th>'
+      + `<th colspan="${STORAGE_KINDS.length}" title="The output the run will leave on NIRD">Storage</th></tr>`;
+    const columnHeads = groupHeads + '<tr class="ct-cols"><th>Simulation</th>'
       + '<th class="n">Members</th><th class="n">Years each</th><th class="n">Member-years</th>'
       + '<th class="n">Core-hr / sim-yr</th><th class="n">SYPD</th><th class="n">Core-hours</th><th class="n" title="Days of wall-clock time one member takes to run: its years divided by SYPD">Days to run a member</th>'
       + STORAGE_KINDS.map((k, i) => `<th class="n${i === 0 ? " ct-storage-start" : ""}" title="${k.note}, in TiB">${k.label}<br>TiB</th>`).join("") + "</tr>";
@@ -1706,6 +1715,12 @@
             const td = document.createElement("td");
             td.className = "cfg-num" + (i === 0 ? " cfg-machine-start" : "") + (i < 2 ? (own ? ` measured machine-${mc.key}` : " estimate") : "");
             if (i === 2 && own && own.runs.length) td.appendChild(sparkButton(r, mc, own));
+            else if (i < 2 && !own && text !== "–"){
+              const pill = document.createElement("span");
+              pill.className = "est-val";
+              pill.textContent = text;
+              td.appendChild(pill);
+            }
             else td.textContent = text;
             if (i < 2) td.title = own
               ? `${r.name} on ${mc.label}: ${own.jobs} job${own.jobs === 1 ? "" : "s"} of ${own.cases} case${own.cases === 1 ? "" : "s"}, ${own.years} simulated years`

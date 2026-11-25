@@ -477,8 +477,7 @@ above the tables shows every run in the plan.
   cases' timing files, and on Olivia until its cases have timing files.
 - The output sizes give the storage estimate for each run in the Cost plan.
 - In the cost tables, a value measured from the run's own cases is in the usual
-  colour. A value taken from its configuration is an estimate, and is shaded
-  orange, in orange italics. "Where the estimates come from", closed until
-  opened, lists for each
-  configuration the runs whose timing files and output supply the estimate, and
+  colour. A value taken from its configuration is an estimate, and is shown in
+  orange italics in an orange pill. "Where the estimates come from", closed
+  until opened, lists for each configuration the runs whose timing files and output supply the estimate, and
   the runs that use it.
