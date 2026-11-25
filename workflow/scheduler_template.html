@@ -35,7 +35,8 @@
 
     --focus-ring: #2a78d6;
     /* An estimated cost, throughput or storage: its configuration's, not measured from the run's own cases. */
-    --estimate:   #a35f00;
+    --estimate:   #9a4300;
+    --estimate-wash: #ffe8c7;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -64,7 +65,8 @@
       --danger:          #e66767;
       --danger-wash:     #3a1c1c;
       --focus-ring: #3987e5;
-      --estimate:   #e5a23a;
+      --estimate:   #ffc069;
+      --estimate-wash: #4a3212;
     }
   }
   :root[data-theme="dark"]{
@@ -93,7 +95,8 @@
     --danger:          #e66767;
     --danger-wash:     #3a1c1c;
     --focus-ring: #3987e5;
-    --estimate:   #e5a23a;
+    --estimate:   #ffc069;
+    --estimate-wash: #4a3212;
   }
 
   *{ box-sizing: border-box; }
@@ -270,8 +273,9 @@
   .cost-table tr.ct-off td{ color: var(--text-muted); }
   .cost-table .ct-name{ font-weight: 600; }
   .cost-table .ct-muted{ color: var(--text-muted); }
-  /* An estimated value is in its own colour and in italics, so it doesn't rest on colour alone. */
-  .cost-table td.ct-est, #expTimingTable td.estimate, .est-key{ color: var(--estimate); font-style: italic; }
+  /* An estimated value has an orange background and orange italics, so it doesn't rest on the text's colour alone. */
+  .cost-table td.ct-est, #expTimingTable td.estimate, .est-key{ color: var(--estimate); background: var(--estimate-wash); font-style: italic; }
+  .est-key{ padding: 0 4px; border-radius: 3px; }
   .est-legend{ display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 10px; font-size: 12.5px; color: var(--text-secondary); }
   .est-legend .meas-key{ color: var(--text-primary); font-family: "JetBrains Mono", monospace; }
   .est-legend .est-key{ font-family: "JetBrains Mono", monospace; }
@@ -754,7 +758,7 @@
       <p class="editor-caption">The runs with a case issue, with their cost and throughput on each machine.</p>
       <ul class="caption-list">
         <li><b>Measured:</b> from the run's timing files on <span class="machine-tag">Olivia</span> or <span class="machine-tag machine-betzy">Betzy</span>, the mean over its jobs, each weighted by the years it simulated. Click a run's job count to plot its SYPD and cost job by job.</li>
-        <li><b>Estimated:</b> a run with no timing files on a machine yet shows its configuration's value in <span class="est-key">orange italics</span>, and is costed with it.</li>
+        <li><b>Estimated:</b> a run with no timing files on a machine yet shows its configuration's value in <span class="est-key">orange shading</span>, and is costed with it.</li>
       </ul>
     </div>
     <div class="table-scroll">
@@ -797,7 +801,7 @@
             <li>Restarts are members × the restart sets each member will keep × the GiB of one set.</li>
           </ul>
         </li>
-        <li><b>Measured or estimated:</b> a value is measured if the run has timing files or output of its own on NIRD. Otherwise it is an estimate taken from its configuration, and shown in <span class="est-key">orange italics</span>. Hover a value for where it comes from, or open "Where the estimates come from" below the index.</li>
+        <li><b>Measured or estimated:</b> a value is measured if the run has timing files or output of its own on NIRD. Otherwise it is an estimate taken from its configuration, and shown in <span class="est-key">orange shading</span>. Hover a value for where it comes from, or open "Where the estimates come from" below the index.</li>
       </ul>
     </div>
     <div id="costTables"></div>
