@@ -8,19 +8,19 @@ column gives, e.g. "LM" or "LM, MM". An experiment with no resolution there is n
 Each run's members and years come from the sheet's Ensemble Members and min_yrs_per_sim
 columns. With more than one resolution among the runs, run names carry their resolution.
 
-Each run is assigned a configuration from COSTS. A configuration whose compsets include
-the run's compset at that resolution wins; shell-style wildcards are allowed
-(N7*EsmGhgGaxg). Otherwise the required model components and compset decide:
+Each run is assigned a configuration from COSTS. A configuration whose experiments include
+the run's experiment at that resolution wins. Otherwise the required model components and
+the experiment's name decide:
   LAND                          -> land-only
   DCPP activity                 -> DCPP
-  AGCM...                       -> AMIP at the resolution
-  emission-driven (esm-*, *Esm*) -> ESM at the resolution
+  AGCM... or nAGCM... (nudged)  -> AMIP at the resolution
+  emission-driven (esm-*)       -> ESM at the resolution
   anything else                 -> coupled at the resolution
+The spreadsheet's compsets are not read.
 A run whose configuration is not in COSTS is left out of the page, with a warning.
 """
 
 import csv
-import fnmatch
 import io
 import json
 import os
@@ -53,40 +53,41 @@ def read_experiments(text):
 
 # The configurations: cost in core-hours per simulated year and throughput in
 # simulated years per day, from the timing files of runs on Olivia (None where
-# there is no timing yet), and the compsets that belong to each. A configuration
-# can also carry betzyCostPerYear and betzyThroughput. The page replaces these
-# with the values measured from the cases' timing files on NIRD, machine by machine.
-# A core-hour is what the timing files call a pe-hour: CIME counts every core of each
-# node a job uses, 128 per node on Betzy and 256 on Olivia. The two machines' cores
-# differ, so a configuration's cost on one is not its cost on the other.
+# there is no timing yet). A configuration's experiments are those given its cost
+# by name. Every other experiment is given one by the rule in this module's docstring.
+# A configuration can also carry betzyCostPerYear and betzyThroughput. The page
+# replaces these with the values measured from the cases' timing files on NIRD,
+# machine by machine. A core-hour is what the timing files call a pe-hour: CIME counts
+# every core of each node a job uses, 128 per node on Betzy and 256 on Olivia. The two
+# machines' cores differ, so a configuration's cost on one is not its cost on the other.
 COSTS = [
-    # N1850GhgGaxg piControl LM timing file (2048 PEs, 2036 active; 256 tasks per node)
+    # piControl LM timing file (2048 PEs, 2036 active; 256 tasks per node)
     {"name": "NorESM3 LM", "resolution": "LM", "costPerYear": 2564.96, "throughput": 19.16,
-     "compsets": "N1850GhgGaxg NHistGhgGaxg N2xCO2GhgGaxg N0p5xCO2GhgGaxg N1PctCO2BgcGhgGaxg N1PctCO2RadGhgGaxg"},
-    # N1PctCO2GhgGaxg 1pctCO2 LM timing file
+     "experiments": []},
+    # 1pctCO2 LM timing file
     {"name": "NorESM3 1pctCO2 LM", "resolution": "LM", "costPerYear": 2606.78, "throughput": 18.86,
-     "compsets": "N1PctCO2GhgGaxg"},
-    # N4xCO2GhgGaxg abrupt-4xCO2 LM timing file
+     "experiments": ["1pctCO2"]},
+    # abrupt-4xCO2 LM timing file
     {"name": "NorESM3 4xCO2 LM", "resolution": "LM", "costPerYear": 2429.92, "throughput": 20.23,
-     "compsets": "N4xCO2GhgGaxg"},
+     "experiments": ["abrupt-4xCO2"]},
     # piControl MM timing file (older code)
     {"name": "NorESM3 MM", "resolution": "MM", "costPerYear": 5246.17, "throughput": 10.54,
-     "compsets": ""},
+     "experiments": []},
     # esm-piControl LM timing file (13.295 s per model day)
     {"name": "NorESM3 ESM LM", "resolution": "LM", "costPerYear": 2760.72, "throughput": 17.80,
-     "compsets": "N1850EsmGhgGaxg NHistEsmGhgGaxg N7*EsmGhgGaxg N10EsmGhgGaxg N10CdrEsmGhgGaxg N10ZecEsmGhgGaxg"},
+     "experiments": []},
     {"name": "NorESM3 ESM MM", "resolution": "MM", "costPerYear": None, "throughput": None,
-     "compsets": ""},
+     "experiments": []},
     # amip LM timing file
     {"name": "NorESM3 AMIP LM", "resolution": "LM", "costPerYear": 1360.06, "throughput": 27.10,
-     "compsets": "NF1850GhgAnthro NF4xCO2Ghg NFAMIPp4k NFAMIPpiF"},
+     "experiments": []},
     {"name": "NorESM3 AMIP MM", "resolution": "MM", "costPerYear": None, "throughput": None,
-     "compsets": ""},
+     "experiments": []},
     # No timing files yet: the runs are tracked, and costed once their cases have timings.
     {"name": "NorESM3 land-only", "resolution": "LM", "costPerYear": None, "throughput": None,
-     "compsets": ""},
+     "experiments": []},
     {"name": "NorESM3 DCPP", "resolution": "LM", "costPerYear": None, "throughput": None,
-     "compsets": ""},
+     "experiments": []},
 ]
 
 
@@ -100,35 +101,41 @@ def number(v):
         return None
 
 
-def compset_rules(costs):
-    """(resolution, pattern, configuration name) for every compset the cost table lists.
+def atmosphere_only(exp):
+    """True if the experiment runs the atmosphere without the ocean: its required model
+    components start with AGCM, or with nAGCM for a nudged atmosphere.
+
+    exp: one experiment, a row of the spreadsheet as read_experiments() gives it."""
+    return exp.get("required_model_components", "").strip().upper().startswith(("AGCM", "NAGCM"))
+
+
+def experiment_rules(costs):
+    """The configuration each experiment the cost table names is given, keyed by
+    (resolution, experiment).
 
     costs: the cost table, COSTS."""
-    return [(c["resolution"], pattern, c["name"]) for c in costs for pattern in c["compsets"].split()]
+    return {(c["resolution"], e): c["name"] for c in costs for e in c["experiments"]}
 
 
-def config_name(exp, resolution, rules=()):
+def config_name(exp, resolution, rules=None):
     """The name of the configuration from the cost table that the experiment is run with at
     the resolution, by the rule in this module's docstring.
 
     exp: one experiment, a row of the spreadsheet as read_experiments() gives it.
     resolution: the resolution, "LM" or "MM".
-    rules: the compsets of the cost table, as compset_rules() gives them; empty to choose by
-      the required model components and compset alone."""
-    compset_alias = exp.get("Compset Alias", "").strip()
-    for res, pattern, name in rules:
-        if res == resolution and compset_alias and fnmatch.fnmatchcase(compset_alias, pattern):
-            return name
-    comps = exp.get("required_model_components", "").upper()
-    compset = exp.get("Compset Alias", "")
-    name = exp["experiment_id"]
+    rules: the experiments the cost table names, as experiment_rules() gives them; None to
+      choose by the required model components and the experiment's name alone."""
+    name = exp["experiment_id"].strip()
+    if (resolution, name) in (rules or {}):
+        return rules[(resolution, name)]
+    comps = exp.get("required_model_components", "").strip().upper()
     if comps.startswith("LAND"):
         return "NorESM3 land-only"
     if exp.get("activity_id", "").startswith("DCPP"):
         return "NorESM3 DCPP"
-    if comps.startswith("AGCM"):
+    if atmosphere_only(exp):
         return f"NorESM3 AMIP {resolution}"
-    if name.startswith("esm-") or "Esm" in compset:
+    if name.startswith("esm-"):
         return f"NorESM3 ESM {resolution}"
     return f"NorESM3 {resolution}"
 
@@ -153,7 +160,7 @@ def build(experiments, costs):
                 "throughput": c["throughput"], "betzyCostPerYear": c.get("betzyCostPerYear"),
                 "betzyThroughput": c.get("betzyThroughput")} for i, c in enumerate(costs, 1)]
     cfg_id = {c["name"]: c["id"] for c in configs}
-    rules = compset_rules(costs)
+    rules = experiment_rules(costs)
     if experiments and RESOLUTION_COLUMN not in experiments[0]:
         raise ValueError(f"the spreadsheet has no {RESOLUTION_COLUMN} column")
     resolutions = sorted({r for e in experiments for r in resolutions_of(e)})
@@ -206,7 +213,7 @@ def build(experiments, costs):
                 "steps": [],
                 # The DECK experiments are grouped under their activity, CMIP.
                 "mip": "CMIP" if tier == "DECK" or activity in ("", "CMIP") else activity,
-                "amip": "Yes" if e.get("required_model_components", "").upper().startswith("AGCM") else "No",
+                "amip": "Yes" if atmosphere_only(e) else "No",
             })
     return configs, sims, warnings
 
@@ -240,7 +247,7 @@ def page_text(sheet_text, sheet):
     3. Each run takes from the spreadsheet its members (Ensemble Members), its years per
        member (min_yrs_per_sim), its start year, the parent it branches from and its MIP
        (DECK runs are grouped under CMIP).
-    4. Each run is given a configuration from COSTS: one that lists the run's compset, or
+    4. Each run is given a configuration from COSTS: one that names the run's experiment, or
        otherwise land-only, DCPP, AMIP, ESM or coupled, by the rule in this module's
        docstring.
     5. It replaces the template's data block with the configurations, the runs, sheet and

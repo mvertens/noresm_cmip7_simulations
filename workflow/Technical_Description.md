@@ -134,10 +134,13 @@ changed by editing it there, and the code `nird_progress.py` uses to build
 3. It gives each run an estimated cost and throughput. The estimates come from
    the `COSTS` table in `build_scheduler.py`, which has one estimate for each
    model configuration, e.g. `NorESM3 LM` for the coupled model at LM
-   resolution. Each estimate lists the compsets it applies to, e.g.
-   `N1850GhgGaxg`, which is the compset of piControl. A run whose compset is not
-   listed is given the estimate for the coupled, ESM or AMIP configuration at
-   its resolution. A configuration whose cost and throughput aren't known yet,
+   resolution. An estimate can name the experiments it applies to, e.g.
+   `abrupt-4xCO2` for `NorESM3 4xCO2 LM`. Any other run is given an estimate by
+   its required model components and its experiment's name: land-only for
+   LAND, DCPP for a DCPP activity, AMIP for AGCM or nAGCM (a nudged
+   atmosphere), ESM for an experiment whose name starts with `esm-`, and
+   otherwise the coupled model, at its resolution. The spreadsheet's compsets
+   are not read. A configuration whose cost and throughput aren't known yet,
    such as land-only or DCPP, is listed in `COSTS` without them. Its runs are
    tracked as usual and marked in the Cost plan as not yet costed, until timing
    files supply the numbers. A run whose configuration is not in `COSTS` at all

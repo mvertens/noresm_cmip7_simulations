@@ -1,5 +1,12 @@
 # Overview
 
+> **The experiment name links the sheet to the simulations.** The tracker's
+> rows come from the sheet's `experiment_id`. A simulation's experiment comes
+> from the directory its run script is in on GitHub,
+> `scripts/<MIP>/<experiment>/`. The simulation goes into a row only if the
+> directory's name and the `experiment_id` are spelled exactly the same,
+> including capitals.
+
 ## How an issue is linked to a row in the tracker
 
 Every issue points to one run script, and the tracker gets almost everything
@@ -16,8 +23,9 @@ from that script.
 2. **What the tracker reads from the run script:**
 
    - **The directory it sits in**, `scripts/<MIP>/<experiment>/`. This gives
-     the experiment, e.g. `historical`, which decides the case's row in the
-     sheet.
+     the case's experiment, e.g. `historical`, which decides the case's row in
+     the sheet. The directory's name must match the sheet's `experiment_id`
+     exactly.
    - **`create_newcase --case …`** gives the case name, e.g.
      `NHistGhgGaxg.LM.nor30b29a.020.20261113`. The tracker uses it to find the
      case on NIRD. The `LM` or `MM` in the name gives the resolution.
@@ -29,7 +37,7 @@ from that script.
    - **`./xmlchange RUN_REFDATE=…`** is the date in the parent the run starts
      from.
    - **`./xmlchange RUN_STARTDATE=…`** is the model start date. The tracker
-     counts the years done from it. It overrides the sheet's `start_year`.
+     counts the years done from it. It must match the sheet's `start_year`.
 
    The compset, the user mods and the run length in the script are not read.
 
@@ -37,10 +45,14 @@ from that script.
    and reads how far it has run, from its history files. The CMORization
    status comes from the output directories.
 
-4. **Case → row in the sheet.** The tracker puts the case in the row with the
-   same experiment and resolution, for example historical at LM. The script's
-   directory and the sheet's `experiment_id` must therefore be spelled exactly
-   the same.
+4. **Case → row in the sheet.** The rows come from the sheet alone: each
+   `experiment_id` at each of its resolutions is a row, with its cost estimate,
+   before any run script or case exists. The tracker then puts the case in the
+   row with the same experiment and resolution, for example historical at LM.
+   The script's directory and the sheet's `experiment_id` must therefore be
+   spelled exactly the same, including capitals. A case whose directory matches
+   no `experiment_id` has no row, and is listed under "Not shown" below the
+   tracker.
 
 5. **The issue's variant label**, e.g. `r2i1p1f1`, says which ensemble member
    the case is. The tracker also uses it to find the case's CMORized files.
@@ -67,17 +79,24 @@ The issue's description and comments are not read.
 
 ## What the tracker reads from the sheet
 
-- **`experiment_id`**: the name of the experiment
+- **`experiment_id`**: the name of the experiment. It names the experiment's
+  rows and chooses their cost estimate. A run script's directory must have
+  this name for its case to go into one of these rows.
 - **`Resolution`**: which resolutions it is run at (LM, MM). A row with this
   left empty is not shown.
 - **`Ensemble Members`**: how many members are planned
 - **`min_yrs_per_sim`**: how many years each member should run
-- **`start_year`**: the first model year, unless the run script sets
-  `RUN_STARTDATE`
-- **`branches from`**: the parent experiment
+- **`start_year`**: the first model year. It must match `RUN_STARTDATE` in
+  the run script. If they differ, the tracker shows a start date error and
+  counts the years done from `RUN_STARTDATE`.
+- **`branches from`**: the parent experiment. It must match the experiment of
+  the case that `RUN_REFCASE` in the run script names. Once a run script names
+  a parent, the tracker shows that parent.
 - **`activity_id`, `Tier`**: which MIP the run is listed under
-- **`required_model_components`, `Compset Alias`**: only to estimate the cost
-  per simulated year
+- **`required_model_components`**: only to estimate the cost per simulated
+  year
+
+The compsets in the sheet are not read.
 
 The details of how the code works are in
 [Technical_Description.md](Technical_Description.md).
