@@ -53,33 +53,33 @@ def read_experiments(text):
 
 # The configurations: cost in core-hours per simulated year and throughput in
 # simulated years per day, from the timing files of runs on Olivia (None where
-# there is no timing yet). A configuration's experiments are those given its cost
-# by name. Every other experiment is given one by the rule in this module's docstring.
-# A configuration can also carry betzyCostPerYear and betzyThroughput. The page
-# replaces these with the values measured from the cases' timing files on NIRD,
-# machine by machine. A core-hour is what the timing files call a pe-hour: CIME counts
+# there is no timing yet). source names the run the timing is from. A
+# configuration's experiments are those given its cost by name. Every other
+# experiment is given one by the rule in this module's docstring. A configuration
+# can also carry betzyCostPerYear and betzyThroughput. The page replaces these with
+# the values measured from the cases' timing files on NIRD, machine by machine. A core-hour is what the timing files call a pe-hour: CIME counts
 # every core of each node a job uses, 128 per node on Betzy and 256 on Olivia. The two
 # machines' cores differ, so a configuration's cost on one is not its cost on the other.
 COSTS = [
     # piControl LM timing file (2048 PEs, 2036 active; 256 tasks per node)
-    {"name": "NorESM3 LM", "resolution": "LM", "costPerYear": 2564.96, "throughput": 19.16,
+    {"name": "NorESM3 LM", "resolution": "LM", "source": "piControl LM", "costPerYear": 2564.96, "throughput": 19.16,
      "experiments": []},
     # 1pctCO2 LM timing file
-    {"name": "NorESM3 1pctCO2 LM", "resolution": "LM", "costPerYear": 2606.78, "throughput": 18.86,
+    {"name": "NorESM3 1pctCO2 LM", "resolution": "LM", "source": "1pctCO2 LM", "costPerYear": 2606.78, "throughput": 18.86,
      "experiments": ["1pctCO2"]},
     # abrupt-4xCO2 LM timing file
-    {"name": "NorESM3 4xCO2 LM", "resolution": "LM", "costPerYear": 2429.92, "throughput": 20.23,
+    {"name": "NorESM3 4xCO2 LM", "resolution": "LM", "source": "abrupt-4xCO2 LM", "costPerYear": 2429.92, "throughput": 20.23,
      "experiments": ["abrupt-4xCO2"]},
     # piControl MM timing file (older code)
-    {"name": "NorESM3 MM", "resolution": "MM", "costPerYear": 5246.17, "throughput": 10.54,
+    {"name": "NorESM3 MM", "resolution": "MM", "source": "piControl MM, with older code", "costPerYear": 5246.17, "throughput": 10.54,
      "experiments": []},
     # esm-piControl LM timing file (13.295 s per model day)
-    {"name": "NorESM3 ESM LM", "resolution": "LM", "costPerYear": 2760.72, "throughput": 17.80,
+    {"name": "NorESM3 ESM LM", "resolution": "LM", "source": "esm-piControl LM", "costPerYear": 2760.72, "throughput": 17.80,
      "experiments": []},
     {"name": "NorESM3 ESM MM", "resolution": "MM", "costPerYear": None, "throughput": None,
      "experiments": []},
     # amip LM timing file
-    {"name": "NorESM3 AMIP LM", "resolution": "LM", "costPerYear": 1360.06, "throughput": 27.10,
+    {"name": "NorESM3 AMIP LM", "resolution": "LM", "source": "amip LM", "costPerYear": 1360.06, "throughput": 27.10,
      "experiments": []},
     {"name": "NorESM3 AMIP MM", "resolution": "MM", "costPerYear": None, "throughput": None,
      "experiments": []},
@@ -156,7 +156,7 @@ def build(experiments, costs):
 
     experiments: the spreadsheet's experiments, as read_experiments() gives them.
     costs: the cost table, COSTS."""
-    configs = [{"id": f"c{i}", "name": c["name"], "costPerYear": c["costPerYear"],
+    configs = [{"id": f"c{i}", "name": c["name"], "source": c.get("source"), "costPerYear": c["costPerYear"],
                 "throughput": c["throughput"], "betzyCostPerYear": c.get("betzyCostPerYear"),
                 "betzyThroughput": c.get("betzyThroughput")} for i, c in enumerate(costs, 1)]
     cfg_id = {c["name"]: c["id"] for c in configs}

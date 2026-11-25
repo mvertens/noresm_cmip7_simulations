@@ -1,11 +1,12 @@
 # Overview
 
-> **The experiment name links the sheet to the simulations.** The tracker's
-> rows come from the sheet's `experiment_id`. A simulation's experiment comes
-> from the directory its run script is in on GitHub,
-> `scripts/<MIP>/<experiment>/`. The simulation goes into a row only if the
-> directory's name and the `experiment_id` are spelled exactly the same,
-> including capitals.
+> **The experiment name links the sheet to the simulations.**
+>
+> - The tracker's rows come from the sheet's `experiment_id`.
+> - A simulation's experiment comes from the directory its run script is in on
+>   GitHub, `scripts/<MIP>/<experiment>/`.
+> - The simulation goes into a row only if the two are spelled exactly the
+>   same, including capitals.
 
 ## How an issue is linked to a row in the tracker
 
@@ -45,14 +46,17 @@ from that script.
    and reads how far it has run, from its history files. The CMORization
    status comes from the output directories.
 
-4. **Case → row in the sheet.** The rows come from the sheet alone: each
-   `experiment_id` at each of its resolutions is a row, with its cost estimate,
-   before any run script or case exists. The tracker then puts the case in the
-   row with the same experiment and resolution, for example historical at LM.
-   The script's directory and the sheet's `experiment_id` must therefore be
-   spelled exactly the same, including capitals. A case whose directory matches
-   no `experiment_id` has no row, and is listed under "Not shown" below the
-   tracker.
+4. **Case → row in the sheet.**
+
+   - The rows come from the sheet alone. Each `experiment_id` at each of its
+     resolutions is a row, with its cost estimate, before any run script or
+     case exists.
+   - The tracker puts the case in the row with the same experiment and
+     resolution, for example historical at LM.
+   - The script's directory and the sheet's `experiment_id` must therefore be
+     spelled exactly the same, including capitals.
+   - A case whose directory matches no `experiment_id` has no row. It is listed
+     under "Not shown" below the tracker.
 
 5. **The issue's variant label**, e.g. `r2i1p1f1`, says which ensemble member
    the case is. The tracker also uses it to find the case's CMORized files.

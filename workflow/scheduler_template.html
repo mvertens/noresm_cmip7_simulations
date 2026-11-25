@@ -34,6 +34,8 @@
     --danger-wash:     #fceceb;
 
     --focus-ring: #2a78d6;
+    /* An estimated cost, throughput or storage: its configuration's, not measured from the run's own cases. */
+    --estimate:   #a35f00;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -62,6 +64,7 @@
       --danger:          #e66767;
       --danger-wash:     #3a1c1c;
       --focus-ring: #3987e5;
+      --estimate:   #e5a23a;
     }
   }
   :root[data-theme="dark"]{
@@ -90,6 +93,7 @@
     --danger:          #e66767;
     --danger-wash:     #3a1c1c;
     --focus-ring: #3987e5;
+    --estimate:   #e5a23a;
   }
 
   *{ box-sizing: border-box; }
@@ -266,6 +270,11 @@
   .cost-table tr.ct-off td{ color: var(--text-muted); }
   .cost-table .ct-name{ font-weight: 600; }
   .cost-table .ct-muted{ color: var(--text-muted); }
+  /* An estimated value is in its own colour and in italics, so it doesn't rest on colour alone. */
+  .cost-table td.ct-est, #expTimingTable td.estimate, .est-key{ color: var(--estimate); font-style: italic; }
+  .est-legend{ display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 10px; font-size: 12.5px; color: var(--text-secondary); }
+  .est-legend .meas-key{ color: var(--text-primary); font-family: "JetBrains Mono", monospace; }
+  .est-legend .est-key{ font-family: "JetBrains Mono", monospace; }
   /* The storage columns start after a line, apart from the compute columns. */
   .cost-table th.ct-storage-start, .cost-table td:nth-last-child(4){ border-left: 1px solid var(--border); }
   .cost-table .ct-groupinfo{ margin-left: 10px; font-weight: 400; color: var(--text-secondary); }
@@ -281,7 +290,7 @@
   .machine-tag{ display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); }
   .machine-tag::before{ content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--olivia); }
   .machine-tag.machine-betzy::before{ background: var(--betzy); border-radius: 1px; transform: rotate(45deg); width: 8px; height: 8px; }
-  #expTimingTable td.estimate{ color: var(--text-muted); }
+  #expTimingTable td.empty-note{ color: var(--text-muted); }
   #expTimingTable tr.cfg-res th{ text-align: left; }
   .spark-btn{ display: inline-flex; align-items: center; gap: 6px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); color: var(--text-primary); font: inherit; cursor: pointer; }
   .spark-btn:hover{ border-color: var(--accent); }
@@ -314,6 +323,14 @@
   /* ---------- editor tables ---------- */
   .editor-head{ display:flex; flex-direction: column; gap: 2px; }
   .editor-caption{ margin:0; font-size: 12.5px; color: var(--text-muted); }
+  .caption-list{ margin: 4px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--text-muted); }
+  .caption-list li{ margin: 2px 0; }
+  .caption-list ul{ margin: 2px 0; padding-left: 18px; }
+  .caption-list b{ color: var(--text-secondary); }
+  .est-sources{ margin: 0 0 12px; }
+  .est-sources ul{ margin: 6px 0 10px; padding-left: 18px; font-size: 12.5px; color: var(--text-secondary); }
+  .est-sources li{ margin: 4px 0; }
+  .est-sources li ul{ margin: 2px 0; }
   .table-scroll{ overflow-x: auto; }
   table.data-table{
     border-collapse: collapse;
@@ -734,7 +751,11 @@
   <section class="card editor-card" id="expTimingCard">
     <div class="editor-head">
       <h2>Timings by experiment</h2>
-      <p class="editor-caption">The runs with a case issue, with the cost and throughput measured from their cases' timing files on each machine, each line naming its machine, <span class="machine-tag">Olivia</span> or <span class="machine-tag machine-betzy">Betzy</span>: the mean over their jobs, each weighted by the years it simulated. Click a run's job count to plot its SYPD and cost job by job. A run with no timing files on a machine yet shows its configuration's value in grey, and is costed with it.</p>
+      <p class="editor-caption">The runs with a case issue, with their cost and throughput on each machine.</p>
+      <ul class="caption-list">
+        <li><b>Measured:</b> from the run's timing files on <span class="machine-tag">Olivia</span> or <span class="machine-tag machine-betzy">Betzy</span>, the mean over its jobs, each weighted by the years it simulated. Click a run's job count to plot its SYPD and cost job by job.</li>
+        <li><b>Estimated:</b> a run with no timing files on a machine yet shows its configuration's value in <span class="est-key">orange italics</span>, and is costed with it.</li>
+      </ul>
     </div>
     <div class="table-scroll">
       <table class="data-table" id="expTimingTable">
@@ -765,8 +786,19 @@
   <section class="card" id="costTableCard">
     <div class="editor-head">
       <h2>Cost table</h2>
-      <p class="editor-caption">The full planned cost of each run, a table for each MIP at each resolution; progress is tracked on the Tracker page. The runs, their members and their years are the plan the page is built with, and the runs not in it for now are listed at the bottom. Core-hours are members × years × cost per simulated year, on the machine the run runs on: Betzy for a run whose timing files say so, Olivia otherwise. A run with timing files of its own is costed with them; any other run with its configuration's value, the mean over that configuration's runs that have timing files, or an earlier timing if none has. Days to run a member is how long one member takes on its own: its years divided by its SYPD.</p>
-      <p class="editor-caption">The four TiB columns are the output each run will leave on NIRD once all its members and years are done, not what is there now, measured by the progress script from what its cases have on NIRD so far. History is the model's history files, time series cmip7-prep's time series, which are to be deleted, and CMOR the CMORized files of both tools, each members × years × the GiB per simulated year. Restarts are members × the restart sets each member will keep × the GiB of one set: one set every so many years, as the cases keep them, or one set if they keep only one. A run with no output of its own takes its configuration's, in grey; hover a value for what it comes from.</p>
+      <p class="editor-caption">The full planned cost of each run, with a table for each MIP at each resolution. Progress is tracked on the Tracker page.</p>
+      <ul class="caption-list">
+        <li><b>The plan:</b> the runs, their members and their years come from the spreadsheet. The runs not in the plan for now are listed at the bottom.</li>
+        <li><b>Core-hours</b> are members × years × the cost per simulated year, on the machine the run runs on: Betzy if its timing files say so, otherwise Olivia.</li>
+        <li><b>Days to run a member</b> is how long one member takes on its own: its years divided by its SYPD.</li>
+        <li><b>Storage:</b> the four TiB columns are the output each run will leave on NIRD once all its members and years are done, not what is there now.
+          <ul>
+            <li>History, time series and CMOR are members × years × the GiB per simulated year. Time series are cmip7-prep's, and are to be deleted.</li>
+            <li>Restarts are members × the restart sets each member will keep × the GiB of one set.</li>
+          </ul>
+        </li>
+        <li><b>Measured or estimated:</b> a value is measured if the run has timing files or output of its own on NIRD. Otherwise it is an estimate taken from its configuration, and shown in <span class="est-key">orange italics</span>. Hover a value for where it comes from, or open "Where the estimates come from" below the index.</li>
+      </ul>
     </div>
     <div id="costTables"></div>
   </section>
@@ -1000,12 +1032,12 @@
     if (it.off) return '<td class="n"><span class="ct-muted">–</span></td>';
     if (v === null) return `<td class="n" title="No ${k.label.toLowerCase()} output on NIRD yet for this run or its configuration"><span class="ct-muted">–</span></td>`;
     const r = it.rates[k.key];
-    const from = `measured from ${r.own ? "this run's cases" : "its configuration's runs"}`;
+    const from = r.own ? "measured from this run's cases" : "estimated: no output of this run yet, so measured from its configuration's runs";
     const title = k.key === "rest"
       ? `${r.setGib.toFixed(1)} GiB per restart set, ${r.everyYears ? `one every ${r.everyYears} years, so ${restSets(r, it.years)} sets per member` : "one set kept per member"}, ${from}`
       : `${r.rate.toFixed(2)} GiB per simulated year, ${from}`
         + (r.parts ? "\n" + Object.entries(r.parts).map(([p, g]) => `${p}: ${g.toFixed(2)} GiB`).join("\n") : "");
-    return `<td class="n${r.own ? "" : " ct-muted"}" title="${title.replace(/"/g, "&quot;")}">${fmtTB(v)}</td>`;
+    return `<td class="n${r.own ? "" : " ct-est"}" title="${title.replace(/"/g, "&quot;")}">${fmtTB(v)}</td>`;
   }
   // A blank ensemble size is "not decided yet": it schedules one member and is flagged.
   // An explicit 0 excludes the run.
@@ -1053,6 +1085,8 @@
   // Runs not in the plan for now (ensemble 0) are in a table of their own at the
   // bottom, closed until opened.
   let showOffRuns = false;
+  // Whether "Where the estimates come from" is open, kept when the tables are drawn again.
+  let estSourcesOpen = false;
   // The columns' widths in %, from Simulation to CMOR TiB.
   const COST_COL_WIDTHS = [17, 6, 6, 8, 9, 6, 12, 8, 7, 7, 7, 7];
   function renderCostTable(){
@@ -1073,8 +1107,15 @@
       const cpy = Number(costOn(cfg, r)) > 0 ? Number(costOn(cfg, r)) : null;
       const sypd = hasTiming(cfg, r) ? Number(sypdOn(cfg, r)) : null;
       const memberYears = off ? 0 : members * years;
+      // A run without timing files of its own on its machine is costed with an estimate:
+      // its configuration's value.
+      const mc = machineOf(r);
+      const est = !ownTiming(r, mc);
+      const estFrom = !cfg ? "" : cfg.measured && cfg.measured[mc.key]
+        ? `Estimated: no timing files of this run on ${mc.label} yet, so the mean over the timing files of its configuration's runs, ${cfg.name}`
+        : `Estimated: no timing files of this run on ${mc.label} yet, so an earlier timing of its configuration, ${cfg.name}`;
       return {
-        r, cfg, res, off, members, years, cpy, sypd, memberYears, ...plannedStorage(r),
+        r, cfg, res, off, members, years, cpy, sypd, memberYears, est, estFrom, ...plannedStorage(r),
         name: strip(r.name, res),
         mip: r.mip || "CMIP",
         core: cpy !== null && !off ? memberYears * cpy : null,
@@ -1090,15 +1131,19 @@
 
     function rowHtml(it){
       const ens = normalizeEnsemble(it.r.ensemble);
+      // A cost or throughput cell, in the estimate's colour when the run has no timing of its own.
+      const timed = text => it.est && !it.off
+        ? `<td class="n ct-est" title="${esc(it.estFrom)}">${text}</td>`
+        : `<td class="n">${text}</td>`;
       return `<tr${it.off ? ' class="ct-off"' : ""}>`
         + `<td class="ct-name" title="${esc(it.name)}">${esc(it.name)}${machineOf(it.r).key !== MACHINES[0].key ? ` <span class="ct-muted" title="Costed on ${machineOf(it.r).label}, where its timing files say it runs">on ${machineOf(it.r).label}</span>` : ""}</td>`
         + `<td class="n">${ens === null ? '<span class="ct-muted" title="Not set yet; counted as one">–</span>' : ens}</td>`
         + `<td class="n">${fmtN(it.years)}</td>`
         + `<td class="n">${it.off ? dash : fmtN(it.memberYears)}</td>`
-        + `<td class="n">${it.cpy !== null ? fmtN(it.cpy) : dash}</td>`
-        + `<td class="n">${it.sypd ? it.sypd.toFixed(0) : dash}</td>`
-        + `<td class="n">${it.core !== null ? fmtM(it.core) : (it.off ? dash : '<span class="ct-muted">needs timing</span>')}</td>`
-        + `<td class="n">${it.days !== null ? it.days.toFixed(1) : dash}</td>`
+        + (it.cpy !== null ? timed(fmtN(it.cpy)) : `<td class="n">${dash}</td>`)
+        + (it.sypd ? timed(it.sypd.toFixed(0)) : `<td class="n">${dash}</td>`)
+        + (it.core !== null ? timed(fmtM(it.core)) : `<td class="n">${it.off ? dash : '<span class="ct-muted">needs timing</span>'}</td>`)
+        + (it.days !== null ? timed(it.days.toFixed(1)) : `<td class="n">${dash}</td>`)
         + STORAGE_KINDS.map(k => storageCell(it, k)).join("") + "</tr>";
     }
     // A total's core-hours: the sum over its runs with a cost, or "needs timing" when none of
@@ -1122,13 +1167,51 @@
     const columnHeads = '<tr class="ct-cols"><th>Simulation</th>'
       + '<th class="n">Members</th><th class="n">Years each</th><th class="n">Member-years</th>'
       + '<th class="n">Core-hr / sim-yr</th><th class="n">SYPD</th><th class="n">Core-hours</th><th class="n" title="Days of wall-clock time one member takes to run: its years divided by SYPD">Days to run a member</th>'
-      + STORAGE_KINDS.map((k, i) => `<th class="n${i === 0 ? " ct-storage-start" : ""}" title="${k.note}, in TiB">${k.label} TiB</th>`).join("") + "</tr>";
+      + STORAGE_KINDS.map((k, i) => `<th class="n${i === 0 ? " ct-storage-start" : ""}" title="${k.note}, in TiB">${k.label}<br>TiB</th>`).join("") + "</tr>";
     const colgroup = "<colgroup>" + COST_COL_WIDTHS.map(w => `<col style="width:${w}%">`).join("") + "</colgroup>";
     const up = '<a class="sim-index-up" href="#cost-index" title="Back to the index of the tables">↑ index</a>';
     const table = (id, title, info, body, withHeads = true) => `<div class="table-scroll" id="${id}"><table class="data-table cost-table">${colgroup}`
       + `<thead><tr class="ct-title"><th colspan="${NCOLS}">${title}<span class="ct-groupinfo">${info}</span>${up}</th></tr>${withHeads ? columnHeads : ""}</thead>`
       + `<tbody>${body}</tbody></table></div>`;
     const runs = n => `${n} run${n === 1 ? "" : "s"}`;
+    const names = list => list.map(it => esc(it.r.name)).join(", ");
+
+    // Where the estimates come from, closed until opened: for each configuration with an
+    // estimated run, the runs whose timing files and output supply the estimate, and the
+    // runs that use it.
+    function estimateSources(list){
+      const lines = [];
+      configs.forEach(cfg => {
+        const mine = list.filter(it => it.cfg === cfg);
+        const costUsers = mine.filter(it => it.est && it.cpy !== null);
+        const untimed = mine.filter(it => it.core === null);
+        // A run's storage is estimated where it has no output of that kind of its own yet:
+        // in every column, or only in some.
+        const ownKinds = it => STORAGE_KINDS.filter(k => it.rates[k.key] && it.rates[k.key].own).length;
+        const estKinds = it => STORAGE_KINDS.filter(k => it.rates[k.key] && !it.rates[k.key].own).length;
+        const storeUsers = mine.filter(it => estKinds(it) && !ownKinds(it));
+        const storePartly = mine.filter(it => estKinds(it) && ownKinds(it));
+        if (!costUsers.length && !untimed.length && !storeUsers.length && !storePartly.length) return;
+        const timedRuns = mine.filter(it => !it.est);
+        const storeRuns = mine.filter(ownKinds);
+        const costFrom = timedRuns.length
+          ? `the timing files of ${names(timedRuns)}`
+          : cfg.source ? `an earlier timing of ${esc(cfg.source)}` : "";
+        const sub = [];
+        if (costUsers.length) sub.push(`<li><b>Cost and SYPD</b> from ${costFrom}, used for ${names(costUsers)}</li>`);
+        if (untimed.length) sub.push(`<li><b>No cost yet</b>, since no run of this configuration has been timed: ${names(untimed)}</li>`);
+        if (storeUsers.length || storePartly.length){
+          const uses = [];
+          if (storeUsers.length) uses.push(`<li>used for ${names(storeUsers)}, which have no output yet</li>`);
+          if (storePartly.length) uses.push(`<li>used for the columns of ${names(storePartly)} that have no output yet</li>`);
+          sub.push(`<li><b>Storage</b> from the output of ${names(storeRuns)}<ul>${uses.join("")}</ul></li>`);
+        }
+        lines.push(`<li><b>${esc(cfg.name)}</b><ul>${sub.join("")}</ul></li>`);
+      });
+      if (!lines.length) return "";
+      return `<details class="wf-more est-sources"${estSourcesOpen ? " open" : ""}><summary>Where the estimates come from</summary>`
+        + `<ul>${lines.join("")}</ul></details>`;
+    }
 
     // Resolutions none of whose runs have a timing yet are left out, with a note.
     const offItems = items.filter(it => it.off);
@@ -1151,7 +1234,10 @@
       + resList.map(res => `<div class="sim-index-line"><span class="sim-index-res">${esc(res || "Other")}</span>`
         + groups.filter(g => g.res === res).map(g => `<a href="#${g.id}" title="${esc(g.mip)} ${esc(res)} · ${runs(g.list.length)}">${esc(g.mip)}</a>`).join("") + "</div>").join("")
       + '<div class="sim-index-line"><span class="sim-index-res">All</span><a href="#cost-all">Totals</a>'
-      + (offItems.length ? '<a href="#cost-off">Not in the plan</a>' : "") + "</div></nav>";
+      + (offItems.length ? '<a href="#cost-off">Not in the plan</a>' : "") + "</div></nav>"
+      + '<p class="est-legend"><span><span class="meas-key">1,234</span> measured from the run\'s own cases</span>'
+      + '<span><span class="est-key">1,234</span> estimated from its configuration; hover a value for where it comes from</span></p>';
+    html += estimateSources(active);
     groups.forEach(g => {
       const untimed = g.list.filter(it => it.core === null).length;
       html += table(g.id, `${esc(g.mip)} ${esc(g.res)}`, `${runs(g.list.length)}${untimed ? ` · ${untimed} need timing` : ""}`,
@@ -1173,6 +1259,10 @@
     costTablesEl.innerHTML = html;
   }
 
+  // A details element's toggle event doesn't bubble, so it is caught on the way down.
+  costTablesEl.addEventListener("toggle", e => {
+    if (e.target.classList && e.target.classList.contains("est-sources")) estSourcesOpen = e.target.open;
+  }, true);
   costTablesEl.addEventListener("click", e => {
     // The index links scroll within the page, wherever it is served from.
     const a = e.target.closest("a.sim-index-up, .sim-index a");
@@ -1581,7 +1671,7 @@
     const groups = expTimingRows();
     const NCOLS = 5;
     if (!groups.length){
-      expTimingTbody.innerHTML = `<tr><td colspan="${NCOLS}" class="estimate">No run has a case issue yet.</td></tr>`;
+      expTimingTbody.innerHTML = `<tr><td colspan="${NCOLS}" class="empty-note">No run has a case issue yet.</td></tr>`;
       return;
     }
     groups.forEach(({ res, rows }) => {
