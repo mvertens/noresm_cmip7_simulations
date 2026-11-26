@@ -458,6 +458,41 @@ above the tables shows every run in the plan.
   start.
 - A case that continues an earlier case of the same member is shown underneath
   that case in the Issues column.
+- A switch above the tables shows the tracker by experiment, a row for each run
+  and member, or by case, a row for each case issue.
+- The view by case has a section for each kind of experiment, found by the
+  experiment's name. A section is shown only when it has cases to show.
+  - piControl, for names with `piControl`
+  - historical, for names that start with `historical` or `esm-hist`
+  - DAMIP, for names that start with `hist-`
+  - 1pctCO2, for names that start with `1pct` or `esm-1pct`
+  - abrupt, for names that start with `abrupt`
+  - Flat10, for names with `flat10`
+  - scenario, for names with `scen`
+  - AMIP, for names that start with `amip`
+  - piClim, for names that start with `piClim-`
+  - Other, for the rest
+
+  Within a section, LM comes before MM, and the experiments are otherwise in
+  the sheet's order. Each section has its own colour, as in the meeting slides,
+  and its experiments are in two shades of it by turns.
+- The view by case puts an experiment's cases together, member by member, in the
+  order they continue each other. The experiment and the member are named on
+  their first row only, and a line separates one member's cases from the next. Each row gives the member, the NorESM3 beta
+  and resolution from the case name, the case name, the setup, the owner, the
+  issue and the model years the case covers.
+  - The setup is E-driven for an `esm-` experiment, atmosphere only for an
+    atmosphere-only one, and C-driven otherwise.
+  - A case covers the years from its start year to the year before the next
+    case's start year. The last case covers the years up to the last full model
+    year on NIRD. A member that is not completed has its planned last year in
+    brackets after its last case.
+  - The view first shows only the members that are not completed. A checkbox
+    shows the completed ones too.
+  - Each case has a tick box. "Show only the selected cases" then shows only
+    the ticked cases, completed or not, under their sections, and "Show all
+    cases" goes back. The selection is kept while the page is open, not when it
+    is opened again.
 - A cmip7prep chip shows the years cmip7-prep has fully CMORized for the case,
   e.g. `#002 1–50`. If no years are finished yet, it shows the years cmip7-prep
   has started on. Clicking the chip opens a panel with the case's output

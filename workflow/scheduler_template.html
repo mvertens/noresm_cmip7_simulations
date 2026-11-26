@@ -37,6 +37,17 @@
     /* An estimated cost, throughput or storage: its configuration's, not measured from the run's own cases. */
     --estimate:   #9a4300;
     --estimate-wash: #ffe8c7;
+    /* The sections of the tracker's view by case, coloured as in the meeting slides. */
+    --sec-picontrol: #d9a400;
+    --sec-historical: #2a78d6;
+    --sec-1pct: #4f9a6e;
+    --sec-abrupt: #e0607e;
+    --sec-flat10: #c8322f;
+    --sec-other: #898781;
+    --sec-damip: #7a5cc4;
+    --sec-scenario: #eb6834;
+    --sec-amip: #1a9a9c;
+    --sec-piclim: #8a8f2a;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -67,6 +78,16 @@
       --focus-ring: #3987e5;
       --estimate:   #ffc069;
       --estimate-wash: #4a3212;
+      --sec-picontrol: #f0c040;
+      --sec-historical: #4f95ec;
+      --sec-1pct: #6fbf8f;
+      --sec-abrupt: #ee86a0;
+      --sec-flat10: #ea5a55;
+      --sec-other: #a3a29a;
+      --sec-damip: #9d86e6;
+      --sec-scenario: #f08a5c;
+      --sec-amip: #3cc0c0;
+      --sec-piclim: #b5ba4a;
     }
   }
   :root[data-theme="dark"]{
@@ -97,6 +118,16 @@
     --focus-ring: #3987e5;
     --estimate:   #ffc069;
     --estimate-wash: #4a3212;
+    --sec-picontrol: #f0c040;
+    --sec-historical: #4f95ec;
+    --sec-1pct: #6fbf8f;
+    --sec-abrupt: #ee86a0;
+    --sec-flat10: #ea5a55;
+    --sec-other: #a3a29a;
+    --sec-damip: #9d86e6;
+    --sec-scenario: #f08a5c;
+    --sec-amip: #3cc0c0;
+    --sec-piclim: #b5ba4a;
   }
 
   *{ box-sizing: border-box; }
@@ -583,6 +614,40 @@
   #simTables tr.sim-group th:not(.sim-group-name){ text-align: center; }
   #simTables tr.sim-group-off th{ color: var(--text-muted); background: color-mix(in srgb, var(--text-muted) 10%, transparent); }
   #simTables tr.sim-group-off th.sim-group-name{ border-left-color: var(--text-muted); }
+  /* The switch between the tracker's two views, by experiment and by case. */
+  .view-switch{ display: inline-flex; margin: 0 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+  .view-switch button{ padding: 4px 14px; font: inherit; font-size: 12.5px; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; }
+  .view-switch button + button{ border-left: 1px solid var(--border-strong); }
+  .view-switch button[aria-pressed="true"]{ background: color-mix(in srgb, var(--series-1) 16%, transparent); color: var(--text-primary); font-weight: 600; }
+  .case-filter{ margin-left: 10px; font-size: 12px; color: var(--text-secondary); }
+  .case-filter input{ vertical-align: -2px; margin-right: 4px; }
+  /* The view by case: a row for each case, with an experiment's cases together. */
+  #simTables table.case-table{ min-width: 960px; }
+  #simTables table.case-table td{ white-space: nowrap; }
+  #simTables table.case-table tr.exp-first > td{ border-top: 2px solid var(--text-secondary); }
+  /* A line above each member's first case, and none between its cases in the Experiment and
+     Member columns, so a member's cases read as one block under its name. */
+  #simTables table.case-table tr:has(+ tr.case-member-first:not(.exp-first)) > td:not(.case-exp):not(.case-tick){ border-bottom: 1px solid var(--text-muted); }
+  /* The tick box that selects a case. */
+  #simTables table.case-table td.case-tick{ text-align: center; padding-left: 2px; padding-right: 2px; }
+  #simTables table.case-table td.case-tick input{ margin: 0; cursor: pointer; }
+  .sim-toggle:disabled{ opacity: 0.5; cursor: default; }
+  /* Room between the view by case's buttons, and before the tables. */
+  .case-controls .sim-toggle{ margin-left: 16px; }
+  .case-controls .sim-toggle + .sim-toggle{ margin-left: 24px; }
+  p.case-controls{ margin-bottom: 10px; }
+  /* Each section in its colour: the heading bar, a band down the left, and its experiments
+     in two shades by turns. */
+  #simTables table.case-table tr.sim-group th{ color: var(--text-primary); background: color-mix(in srgb, var(--sec) 26%, transparent); }
+  #simTables table.case-table tr.sim-group th.sim-group-name{ border-left: 6px solid var(--sec); }
+  #simTables table.case-table td:first-child{ border-left: 6px solid var(--sec); }
+  #simTables table.case-table tr.sec-a > td{ background: color-mix(in srgb, var(--sec) 16%, transparent); }
+  #simTables table.case-table tr.sec-b > td{ background: color-mix(in srgb, var(--sec) 7%, transparent); }
+  #simTables table.case-table tr:not(:last-child) > td.case-exp,
+  #simTables table.case-table tr:not(:last-child) > td.case-member{ border-bottom: none; }
+  #simTables table.case-table td.case-name{ font-family: "JetBrains Mono", monospace; font-size: 12px; }
+  #simTables table.case-table td.case-exp{ font-weight: 600; }
+  #simTables table.case-table .planned{ color: var(--text-muted); }
   #simTables tr.row-disabled{ opacity: 0.5; }
   #simTables tr.row-disabled td.col-name .sim-name{ text-decoration: line-through; text-decoration-color: var(--text-muted); }
   #simTables tr.row-completed td.col-name .sim-name{ font-style: italic; }
@@ -1887,6 +1952,8 @@
 
   function renderSimTable(){
     simTables.innerHTML = "";
+    simTables.appendChild(viewSwitch());
+    if (simView === "case"){ renderCaseView(); return; }
     // Each group's runs, each run as the member rows that are shown.
     const groups = simDisplayGroups()
       .map(g => ({ ...g, runs: g.rows.map(r => memberViews(r).filter(simShown)).filter(vs => vs.length) }))
@@ -1957,6 +2024,214 @@
           renderSimRow(v, views.length < 2 ? "member-single" : i === 0 ? "member-first" : i === views.length - 1 ? "member-last" : "member-mid");
           if (n % 2 === 0) simTbody.lastElementChild.classList.add("run-shade");
         });
+      });
+    });
+  }
+
+  // The tracker is shown by experiment, a row for each run and member, or by case, a row for
+  // each case issue. The view by case shows only the members that are not completed, until
+  // its checkbox is ticked.
+  let simView = "experiment";
+  let showCompletedCases = false;
+
+  function viewSwitch(){
+    const bar = document.createElement("div");
+    bar.className = "view-switch";
+    bar.setAttribute("role", "group"); bar.setAttribute("aria-label", "How the tracker is shown");
+    [["experiment", "By experiment"], ["case", "By case"]].forEach(([key, label]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = label;
+      b.setAttribute("aria-pressed", String(simView === key));
+      b.onclick = () => { if (simView !== key){ simView = key; renderSimTable(); } };
+      bar.appendChild(b);
+    });
+    return bar;
+  }
+
+  // An emission-driven experiment's name starts with esm-; an atmosphere-only one runs with
+  // prescribed sea surface temperatures and sea ice.
+  const caseSetup = row => row.amip === "Yes" ? "Atmosphere only"
+    : String(row.experiment || "").startsWith("esm-") ? "E-driven" : "C-driven";
+
+  // The years a case covers: from its start year to the year before the next case's, or, for
+  // a member's last case, to the last full model year on NIRD. A member that is not completed
+  // also shows its planned last year in brackets, after its last case.
+  function caseYears(m, bc, last, length){
+    const td = document.createElement("td");
+    td.className = "n";
+    const to = Number.isFinite(bc.shownTo) && bc.shownTo >= bc.from ? bc.shownTo : null;
+    td.textContent = to === null ? `${bc.from}–` : to === bc.from ? `${to}` : `${bc.from}–${to}`;
+    if (to === null) td.title = "No full year on NIRD yet";
+    if (last && !m.completed && length > 0){
+      const planned = document.createElement("span");
+      planned.className = "planned";
+      planned.textContent = ` (${m.start + length - 1})`;
+      planned.title = `The member's planned last year, ${length} years from ${m.start}`;
+      td.appendChild(planned);
+    }
+    return td;
+  }
+
+  // The view by case has a section for each kind of experiment, found by the experiment's
+  // name, in this order; an experiment goes in the first section whose test it passes. A
+  // section is shown only when it has cases to show. Each section's colour is the token
+  // --sec-<color>.
+  const CASE_SECTIONS = [
+    { label: "piControl", color: "picontrol", test: x => /piControl/i.test(x) },
+    { label: "historical", color: "historical", test: x => /^(historical|esm-hist)/i.test(x) },
+    { label: "DAMIP", color: "damip", test: x => /^hist-/i.test(x) },
+    { label: "1pctCO2", color: "1pct", test: x => /^(esm-)?1pct/i.test(x) },
+    { label: "abrupt", color: "abrupt", test: x => /^abrupt/i.test(x) },
+    { label: "Flat10", color: "flat10", test: x => /flat10/i.test(x) },
+    { label: "scenario", color: "scenario", test: x => /scen/i.test(x) },
+    { label: "AMIP", color: "amip", test: x => /^amip/i.test(x) },
+    { label: "piClim", color: "piclim", test: x => /^piClim-/i.test(x) },
+    { label: "Other", color: "other", test: () => true },
+  ];
+  const caseSection = experiment => CASE_SECTIONS.find(s => s.test(String(experiment || "")));
+
+  // The tick box, Experiment, Member, Ver., Res., Case name, Setup, Owner, Issue, Years.
+  const CASE_COL_WIDTHS = [3, 12, 8, 5, 4, 33, 8, 9, 6, 12];
+
+  // The cases ticked in the view by case, by issue number, and whether only those are shown.
+  // They are kept while the page is open, not when it is opened again.
+  const selectedCases = new Set();
+  let onlySelected = false;
+
+  function renderCaseView(){
+    if (!selectedCases.size) onlySelected = false;
+    const filter = document.createElement("p"); filter.className = "sim-index-hint case-controls";
+    filter.append(onlySelected
+      ? `Showing the ${selectedCases.size} selected case${selectedCases.size === 1 ? "" : "s"}.`
+      : showCompletedCases
+        ? "Showing the cases of every simulation that has a case issue."
+        : "Showing the cases of the simulations that are not completed.");
+    if (!onlySelected){
+      const label = document.createElement("label"); label.className = "case-filter";
+      const box = document.createElement("input"); box.type = "checkbox"; box.checked = showCompletedCases;
+      box.onchange = () => { showCompletedCases = box.checked; renderSimTable(); };
+      label.append(box, "Show completed simulations");
+      filter.appendChild(label);
+    }
+    // Tick cases, then show only those; the button says how many are ticked.
+    const only = document.createElement("button");
+    only.type = "button"; only.className = "btn btn-ghost sim-toggle";
+    const onlyText = () => onlySelected ? "Show all cases"
+      : selectedCases.size ? `Show only the ${selectedCases.size} selected case${selectedCases.size === 1 ? "" : "s"}`
+      : "Tick cases to show only those";
+    only.textContent = onlyText();
+    only.disabled = !onlySelected && !selectedCases.size;
+    only.onclick = () => { onlySelected = !onlySelected; renderSimTable(); };
+    filter.appendChild(only);
+    const clear = document.createElement("button");
+    clear.type = "button"; clear.className = "btn btn-ghost sim-toggle";
+    clear.textContent = "Clear the selection";
+    clear.hidden = !selectedCases.size;
+    clear.onclick = () => { selectedCases.clear(); onlySelected = false; renderSimTable(); };
+    filter.appendChild(clear);
+    simTables.appendChild(filter);
+    const tick = (issue, box) => {
+      if (box.checked) selectedCases.add(issue); else selectedCases.delete(issue);
+      if (onlySelected){ renderSimTable(); return; }
+      only.textContent = onlyText();
+      only.disabled = !selectedCases.size;
+      clear.hidden = !selectedCases.size;
+    };
+    // Each section's experiments, LM before MM and otherwise in the sheet's order, each with its
+    // members' cases in the order they continue each other. Showing only the selected cases
+    // shows them whether or not their simulation is completed.
+    const RES_RANK = { LM: 0, MM: 1 };
+    const experiments = sims.map((row, i) => {
+      const run = autoRun(row);
+      const members = (run ? run.members : [])
+        .filter(m => onlySelected || showCompletedCases || !m.completed)
+        .map(m => ({ ...m, shown: m.byCase.map((bc, k) => ({ bc, last: k === m.byCase.length - 1 }))
+          .filter(x => !onlySelected || selectedCases.has(x.bc.issue)) }))
+        .filter(m => m.shown.length);
+      return { row, i, members };
+    }).filter(e => e.members.length)
+      .sort((a, b) => (RES_RANK[a.row.resolution] ?? 9) - (RES_RANK[b.row.resolution] ?? 9) || a.i - b.i);
+    const groups = CASE_SECTIONS.map(s => ({
+      label: s.label, color: s.color, off: false,
+      experiments: experiments.filter(e => caseSection(e.row.experiment) === s),
+    })).filter(g => g.experiments.length);
+    if (!groups.length){
+      const none = document.createElement("p"); none.className = "sim-index-hint";
+      none.textContent = "No cases to show.";
+      simTables.appendChild(none);
+      return;
+    }
+    const heads = ["Member", "Ver.", "Res.", "Case name", "Setup", "Owner", "Issue", "Years"];
+    const titles = {
+      "Ver.": "The NorESM3 beta, from the case name",
+      "Setup": "E-driven for an emission-driven experiment, esm-*, and C-driven otherwise",
+      "Years": "The model years the case covers. In brackets, the member's planned last year",
+    };
+    groups.forEach(group => {
+      const caseCount = group.experiments.reduce((n, e) => n + e.members.reduce((k, m) => k + m.shown.length, 0), 0);
+      const head = document.createElement("tr");
+      head.className = "sim-group" + (group.off ? " sim-group-off" : "");
+      const name = document.createElement("th");
+      name.className = "sim-group-name"; name.colSpan = 2;
+      name.textContent = `${group.label} · ${caseCount} case${caseCount === 1 ? "" : "s"}`;
+      head.appendChild(name);
+      heads.forEach(h => {
+        const th = document.createElement("th"); th.className = "sim-col"; th.textContent = h;
+        if (titles[h]) th.title = titles[h];
+        head.appendChild(th);
+      });
+      const wrap = document.createElement("div"); wrap.className = "table-scroll";
+      const table = document.createElement("table"); table.className = "data-table sim-table case-table";
+      table.style.setProperty("--sec", `var(--sec-${group.color})`);
+      table.insertAdjacentHTML("afterbegin", "<colgroup>" + CASE_COL_WIDTHS.map(w => `<col style="width:${w}%">`).join("") + "</colgroup>");
+      const thead = document.createElement("thead"); thead.appendChild(head);
+      const tbody = document.createElement("tbody");
+      table.append(thead, tbody); wrap.appendChild(table); simTables.appendChild(wrap);
+      // The experiments are in two shades of the section's colour by turns, so each
+      // experiment's cases read as one block.
+      group.experiments.forEach(({ row, members }, n) => {
+        const length = Number(row.years) || 0;
+        let firstOfExp = true;
+        members.forEach(m => m.shown.forEach(({ bc, last }, i) => {
+          const c = (row.cases || []).find(x => x.issue === bc.issue) || {};
+          const tr = document.createElement("tr");
+          if (firstOfExp) tr.classList.add("exp-first");
+          if (i === 0) tr.classList.add("case-member-first");
+          tr.classList.add(n % 2 === 0 ? "sec-a" : "sec-b");
+          const cell = (text, cls, title) => {
+            const td = document.createElement("td");
+            if (cls) td.className = cls;
+            td.textContent = text;
+            if (title) td.title = title;
+            tr.appendChild(td);
+            return td;
+          };
+          const tdTick = cell("", "case-tick");
+          const box = document.createElement("input");
+          box.type = "checkbox"; box.checked = selectedCases.has(bc.issue);
+          box.setAttribute("aria-label", `Select #${bc.issue}`);
+          box.onchange = () => tick(bc.issue, box);
+          tdTick.appendChild(box);
+          cell(firstOfExp ? row.experiment : "", "case-exp", firstOfExp ? row.name : "");
+          cell(i === 0 ? m.variant : "", "case-member");
+          cell(c.version || "");
+          cell(c.resolution || row.resolution || "");
+          const tdCase = cell("", "case-name", c.case || "");
+          const link = document.createElement("a");
+          link.href = `${issuesUrl()}/${bc.issue}`; link.target = "_blank"; link.rel = "noopener";
+          link.textContent = c.case || `#${bc.issue}`;
+          tdCase.appendChild(link);
+          cell(caseSetup(row));
+          cell(c.owner || "");
+          const tdIssue = cell("");
+          const issueLink = document.createElement("a");
+          issueLink.href = `${issuesUrl()}/${bc.issue}`; issueLink.target = "_blank"; issueLink.rel = "noopener";
+          issueLink.textContent = `#${String(bc.issue).padStart(3, "0")}`;
+          tdIssue.appendChild(issueLink);
+          tr.appendChild(caseYears(m, bc, last, length));
+          tbody.appendChild(tr);
+          firstOfExp = false;
+        }));
       });
     });
   }
