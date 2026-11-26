@@ -76,11 +76,8 @@ from GitHub, and what is read from NIRD.
 - **The cmip7-prep output**
 
   cmip7-prep writes the CMORized atmosphere, land, sea ice and land ice output
-  of each case to a directory named after the case in `noresm3/cmip7prep/`, on
-  datapeak or datalake:
-  `/nird/datapeak/NS9560K/noresm3/cmip7prep/<case>` or
-  `/nird/datalake/NS9560K/noresm3/cmip7prep/<case>`. The script looks on
-  datapeak first, and uses datalake for a case with no directory on datapeak.
+  of each case to a directory named after the case,
+  `/nird/datapeak/NS9560K/noresm3/cmip7prep/<case>`.
 
 - **The cmor4cmip7 output**
 
@@ -98,8 +95,8 @@ from GitHub, and what is read from NIRD.
 - The scripts are run on NIRD, in the repository's clone at
   `/projects/NS9560K/www/diagnostics/noresm/noresm_cmip7_simulations`.
 - The user running the scripts needs read access to
-  `/nird/datalake/NS9560K/noresm3/cases`, `noresm3/cmip7prep` in
-  `/nird/datapeak/NS9560K` and `/nird/datalake/NS9560K`, and
+  `/nird/datalake/NS9560K/noresm3/cases`,
+  `/nird/datapeak/NS9560K/noresm3/cmip7prep` and
   `/nird/datapeak/NS9034K/.CMIP7`,
   along with write access to
   `/nird/datalake/NS9560K/www/diagnostics/noresm/cmip7_planning`.

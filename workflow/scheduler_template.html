@@ -719,7 +719,7 @@
             <p>Name each case the issue CMORizes by its case name, e.g. <code>NHistGhgGaxg.LM.nor30b29a.r2i1p1f1.020.20261113</code>, as the template asks. The progress script finds the CMORization issues that name a case, and the tracker links each after the case's issue as <a class="script-chip cmor-chip">cmor</a>. Clicking a case's chip in the cmip7prep or cmor4cmip7 column shows the CMORization issue and its cmor tag version too.</p>
             <div class="wf-decide"><b>To decide:</b> how urgency is shown.</div></li>
           <li id="wf-cmoratm"><div class="wf-title">CMORize the atmosphere, land, sea ice and land ice using cmip7-prep</div>
-            <p>The CMORized output goes in <code>/nird/datapeak/NS9560K/noresm3/cmip7prep/$CASE</code>, or in <code>/nird/datalake/NS9560K/noresm3/cmip7prep/$CASE</code>, where the progress script looks when a case has no directory on datapeak. The tracker's cmip7prep column shows it as follows:</p>
+            <p>The CMORized output goes in <code>/nird/datapeak/NS9560K/noresm3/cmip7prep/$CASE</code>. The tracker's cmip7prep column shows it as follows:</p>
             <ul class="wf-parts">
               <li><b>where:</b> the progress script reads the case's own directory in <code>cmip7prep/</code>, not the ones below it;</li>
               <li><b>which issue:</b> each case has its own directory in <code>cmip7prep/</code>, named after the case, so everything in it belongs to that case's issue. piControl's #2 can be done while #11 is not;</li>
