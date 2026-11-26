@@ -108,7 +108,7 @@ from GitHub, and what is read from NIRD.
 
 | File | What it does | When it is run |
 |---|---|---|
-| `nird_progress.py` | It reads the GitHub issues, the run scripts, the case directories on NIRD and the CMORization directories, and writes `progress.json`. It then downloads the spreadsheet and builds `index.html` from it with `build_scheduler.py`. If anything can't be read or built, it updates neither file. | It is run on NIRD whenever the tracker is to be updated: after new output reaches NIRD, or after the spreadsheet changes. The current plan is to run this as a daily cron job on NIRD. |
+| `nird_progress.py` | It reads the GitHub issues, the run scripts, the case directories on NIRD and the CMORization directories, and writes `progress.json`. It then downloads the spreadsheet and builds `index.html` from it with `build_scheduler.py`. A case's directory on NIRD that can't be read is left out of that case with a warning, and the script carries on. If GitHub or the spreadsheet can't be read, or the page can't be built, it updates neither file. | It is run on NIRD whenever the tracker is to be updated: after new output reaches NIRD, or after the spreadsheet changes. The current plan is to run this as a daily cron job on NIRD. |
 | `build_scheduler.py` | It holds the cost table, and the code that builds `index.html` from the spreadsheet and `scheduler_template.html`. | It is not run on its own: `nird_progress.py` uses it to build the page. |
 | `scheduler_template.html` | It holds the web page's layout, text and JavaScript, and becomes `index.html`. Its JavaScript reads `progress.json` and fills in the tracker. | Its JavaScript runs in the browser each time the web page is opened. |
 

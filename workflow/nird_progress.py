@@ -922,9 +922,11 @@ def case_timing(directory):
 def main():
     """Reads the case issues and the CMORization issues on GitHub, the run scripts on the
     CMIP7_Runscripts branch, the case directories on NIRD and the spreadsheet, and writes
-    progress.json and the page. Raises Failed, and leaves both files as they were, if anything
-    it needs can't be read, the page can't be built, or the files can't be written. Only a
-    failure to write them comes after the validation reports have been copied.
+    progress.json and the page. A case's directory on NIRD that can't be read is left out of
+    that case with a warning, and the run carries on. Raises Failed, and leaves both files as
+    they were, if GitHub or the spreadsheet can't be read, the page can't be built, or the
+    files can't be written. Only a failure to write them comes after the validation reports
+    have been copied.
 
     On NIRD the script is run with no arguments. Its two arguments are for testing a change
     without touching the published page, and for measuring the storage again."""
@@ -1055,7 +1057,15 @@ def main():
                 "labels": labels, "completed": "completed" in labels}
         if variant:
             case["variant"] = variant
-        found_dates = model_dates(HIST_DIR.format(case=name), HIST_PATTERN)
+        # A directory on NIRD this user can't read is left out with a warning, and the rest
+        # of the case is still read.
+        def unreadable(what, e):
+            print(f"warning: #{num} {name}: {what} could not be read, so it is left out: {e}")
+        try:
+            found_dates = model_dates(HIST_DIR.format(case=name), HIST_PATTERN)
+        except OSError as e:
+            unreadable("its history files", e)
+            found_dates = None
         if found_dates:
             last, missing = found_dates
             case["modelDate"] = "%04d-%02d-%02d" % last
@@ -1096,24 +1106,30 @@ def main():
                 case["cmorIssues"].append(ci)
         versions = {}
         if prep_dir := output.get("cmip7prep"):
-            sets = cmor_sets(prep_dir, name)
-            if sets:
-                case["cmor"] = sets
-            # cmip7-prep writes its CMOR files under cmor/ in its output directory.
-            prep_cmor = os.path.join(prep_dir, "cmor")
-            if v := cmor_versions(prep_cmor if os.path.isdir(prep_cmor) else prep_dir, experiment, variant):
-                versions["cmip7prep"] = v
-            # The validation report is copied next to progress.json once the page is built.
-            report = os.path.join(prep_dir, VALIDATION_REPORT)
-            if os.path.isfile(os.path.join(report, "index.html")) and TITLE_CHARACTERS.fullmatch(name):
-                reports[name] = report
-                case["validationReport"] = f"{VALIDATION_COPIES}/{name}/index.html"
+            try:
+                sets = cmor_sets(prep_dir, name)
+                if sets:
+                    case["cmor"] = sets
+                # cmip7-prep writes its CMOR files under cmor/ in its output directory.
+                prep_cmor = os.path.join(prep_dir, "cmor")
+                if v := cmor_versions(prep_cmor if os.path.isdir(prep_cmor) else prep_dir, experiment, variant):
+                    versions["cmip7prep"] = v
+                # The validation report is copied next to progress.json once the page is built.
+                report = os.path.join(prep_dir, VALIDATION_REPORT)
+                if os.path.isfile(os.path.join(report, "index.html")) and TITLE_CHARACTERS.fullmatch(name):
+                    reports[name] = report
+                    case["validationReport"] = f"{VALIDATION_COPIES}/{name}/index.html"
+            except OSError as e:
+                unreadable(f"cmip7-prep's output in {prep_dir}", e)
         if "cmor4cmip7" in output:
-            ranges = cmor_file_years(output["cmor4cmip7"], experiment, variant)
-            if ranges:
-                case["cmor4cmip7"] = ranges
-            if v := cmor_versions(output["cmor4cmip7"], experiment, variant):
-                versions["cmor4cmip7"] = v
+            try:
+                ranges = cmor_file_years(output["cmor4cmip7"], experiment, variant)
+                if ranges:
+                    case["cmor4cmip7"] = ranges
+                if v := cmor_versions(output["cmor4cmip7"], experiment, variant):
+                    versions["cmor4cmip7"] = v
+            except OSError as e:
+                unreadable(f"cmor4cmip7's output in {output['cmor4cmip7']}", e)
         if versions:
             case["cmorVersions"] = versions
         kept = dict(earlier.get((num, name), {}))
@@ -1124,16 +1140,23 @@ def main():
             kept.pop("timeseries", None)
             if "cmor" in kept:
                 kept["cmor"] = {t: v for t, v in kept["cmor"].items() if t != "cmip7prep"}
-        storage = case_storage(CASE_DIR.format(case=name), name,
-                               prep_dir, output.get("cmor4cmip7"), experiment, variant, kept)
+        try:
+            storage = case_storage(CASE_DIR.format(case=name), name,
+                                   prep_dir, output.get("cmor4cmip7"), experiment, variant, kept)
+        except OSError as e:
+            unreadable("the size of its output", e)
+            storage = None
         if storage:
             case["storage"] = storage
         # Each case's timing files are in <case>/<case>/timing in its archive.
         timing_dir = (CASE_DIR + "/{case}/timing").format(case=name)
         if os.path.isdir(timing_dir):
-            timing, machine = case_timing(timing_dir)
-            if timing:
-                case["timing"], case["machine"] = timing, machine
+            try:
+                timing, machine = case_timing(timing_dir)
+                if timing:
+                    case["timing"], case["machine"] = timing, machine
+            except OSError as e:
+                unreadable(f"its timing files in {timing_dir}", e)
         cases.append(case)
         # The line printed for each case gives its latest model date and its start date.
         if "modelDate" in case:
